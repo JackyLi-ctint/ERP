@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Link } from "react-router-dom";
 import apiClient from "../../lib/api";
+import { getLeaveBalances } from "../../lib/api";
 import { LeaveDurationPreview } from "../../components/LeaveDurationPreview";
 
 interface LeaveType {
@@ -38,7 +40,8 @@ const submitLeaveSchema = z.object({
   endDate: z.string().min(1, "End date is required"),
   halfDay: z.boolean(),
   period: z.enum(["AM", "PM"]).optional(),
-  reason: z.string().optional(),
+  reason: z.string().max(500, "Reason must be at most 500 characters").optional(),
+  attachmentUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
 type SubmitLeaveFormData = z.infer<typeof submitLeaveSchema>;
@@ -47,6 +50,7 @@ export function ApplyLeavePage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const queryClient = useQueryClient();
+  const today = new Date().toISOString().split("T")[0];
 
   const form = useForm<SubmitLeaveFormData>({
     resolver: zodResolver(submitLeaveSchema),
@@ -57,6 +61,7 @@ export function ApplyLeavePage() {
       halfDay: false,
       period: undefined,
       reason: "",
+      attachmentUrl: "",
     },
   });
 
@@ -70,6 +75,22 @@ export function ApplyLeavePage() {
   });
 
   const leaveTypes = (leaveTypesData?.leaveTypes || []) as LeaveType[];
+
+  // Fetch current year leave balances for available-days display
+  const { data: balancesData } = useQuery({
+    queryKey: ["leaveBalances"],
+    queryFn: getLeaveBalances,
+  });
+
+  const availableMap = useMemo(() => {
+    const map: Record<number, number> = {};
+    if (balancesData) {
+      for (const b of balancesData) {
+        map[b.leaveTypeId] = b.totalDays - b.usedDays - b.pendingDays;
+      }
+    }
+    return map;
+  }, [balancesData]);
 
   // Fetch current user's leave requests
   const { data: requestsData, isLoading: isLoadingRequests } = useQuery({
@@ -85,21 +106,32 @@ export function ApplyLeavePage() {
   // Submit leave request mutation
   const submitMutation = useMutation({
     mutationFn: async (data: SubmitLeaveFormData) => {
-      const payload = {
+      const payload: Record<string, unknown> = {
         leaveTypeId: data.leaveTypeId,
         startDate: data.startDate,
         endDate: data.endDate,
         halfDay: data.halfDay || false,
         period: data.halfDay ? data.period : undefined,
-        reason: data.reason,
+        reason: data.reason || undefined,
       };
+      if (data.attachmentUrl && data.attachmentUrl.trim()) {
+        payload.attachmentUrl = data.attachmentUrl.trim();
+      }
       const response = await apiClient.post("/leave-requests", payload);
       return response.data;
     },
     onSuccess: () => {
       setSuccessMessage("Leave request submitted successfully!");
       setErrorMessage("");
-      form.reset();
+      form.reset({
+        leaveTypeId: 0,
+        startDate: "",
+        endDate: "",
+        halfDay: false,
+        period: undefined,
+        reason: "",
+        attachmentUrl: "",
+      });
       queryClient.invalidateQueries({ queryKey: ["myLeaveRequests"] });
       setTimeout(() => setSuccessMessage(""), 5000);
     },
@@ -132,6 +164,9 @@ export function ApplyLeavePage() {
   const watchEndDate = form.watch("endDate");
   const watchHalfDay = form.watch("halfDay");
   const watchPeriod = form.watch("period");
+  const watchLeaveTypeId = form.watch("leaveTypeId");
+
+  const selectedLeaveType = leaveTypes.find((t) => t.id === watchLeaveTypeId);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -175,11 +210,14 @@ export function ApplyLeavePage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                   >
                     <option value="">Select a leave type</option>
-                    {leaveTypes.map((type) => (
-                      <option key={type.id} value={type.id}>
-                        {type.name} ({type.defaultDays} days)
-                      </option>
-                    ))}
+                    {leaveTypes.map((type) => {
+                      const avail = availableMap[type.id];
+                      return (
+                        <option key={type.id} value={type.id}>
+                          {type.name}{avail != null ? ` — ${avail} days available` : ""}
+                        </option>
+                      );
+                    })}
                   </select>
                   {form.formState.errors.leaveTypeId && (
                     <p className="mt-1 text-sm text-red-600">
@@ -196,6 +234,7 @@ export function ApplyLeavePage() {
                   <input
                     type="date"
                     {...form.register("startDate")}
+                    min={today}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   {form.formState.errors.startDate && (
@@ -213,6 +252,7 @@ export function ApplyLeavePage() {
                   <input
                     type="date"
                     {...form.register("endDate")}
+                    min={watchStartDate || today}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   {form.formState.errors.endDate && (
@@ -297,6 +337,26 @@ export function ApplyLeavePage() {
                   />
                 </div>
 
+                {/* Attachment URL — shown when requiresDocument */}
+                {selectedLeaveType?.requiresDocument && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Attachment URL (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      {...form.register("attachmentUrl")}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="https://..."
+                    />
+                    {form.formState.errors.attachmentUrl && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {form.formState.errors.attachmentUrl.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Submit Button */}
                 <button
                   type="submit"
@@ -354,15 +414,23 @@ export function ApplyLeavePage() {
                         >
                           {req.status}
                         </span>
-                        {req.status === "PENDING" && (
-                          <button
-                            onClick={() => cancelMutation.mutate(req.id)}
-                            disabled={cancelMutation.isPending}
-                            className="text-xs text-red-600 hover:text-red-700 disabled:text-gray-400"
+                        <div className="flex space-x-2">
+                          <Link
+                            to={`/leave-requests/${req.id}/slip`}
+                            className="text-xs text-indigo-600 hover:text-indigo-800"
                           >
-                            Cancel
-                          </button>
-                        )}
+                            Slip
+                          </Link>
+                          {req.status === "PENDING" && (
+                            <button
+                              onClick={() => cancelMutation.mutate(req.id)}
+                              disabled={cancelMutation.isPending}
+                              className="text-xs text-red-600 hover:text-red-700 disabled:text-gray-400"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getUsers, updateUserIdentity, User } from "../../lib/api";
+import { getUsers, updateUserIdentity, updateUserRole, User } from "../../lib/api";
 
 interface EditState {
   team: string;
   title: string;
+  role: string;
 }
 
 export function UserManagementPage() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<EditState>({ team: "", title: "" });
+  const [editValues, setEditValues] = useState<EditState>({ team: "", title: "", role: "" });
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const { data: users = [], isLoading, isError } = useQuery<User[]>({
@@ -19,8 +20,14 @@ export function UserManagementPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { team?: string; title?: string } }) =>
-      updateUserIdentity(id, data),
+    mutationFn: async ({ id, data, role }: { id: string; data: { team?: string; title?: string }; role: string }) => {
+      const promises: Promise<unknown>[] = [];
+      if (data.team !== undefined || data.title !== undefined) {
+        promises.push(updateUserIdentity(id, data));
+      }
+      promises.push(updateUserRole(id, role));
+      await Promise.all(promises);
+    },
     onSuccess: () => {
       setEditingId(null);
       queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -31,7 +38,7 @@ export function UserManagementPage() {
 
   function startEdit(user: User) {
     setEditingId(user.id);
-    setEditValues({ team: user.team ?? "", title: user.title ?? "" });
+    setEditValues({ team: user.team ?? "", title: user.title ?? "", role: user.role });
   }
 
   function cancelEdit() {
@@ -42,12 +49,7 @@ export function UserManagementPage() {
     const payload: { team?: string; title?: string } = {};
     if (editValues.team.trim()) payload.team = editValues.team.trim();
     if (editValues.title.trim()) payload.title = editValues.title.trim();
-    // At least one field must be provided per the API constraint
-    if (!payload.team && !payload.title) {
-      // send both as empty strings to let server validate, or just skip
-      return;
-    }
-    updateMutation.mutate({ id, data: payload });
+    updateMutation.mutate({ id, data: payload, role: editValues.role });
   }
 
   return (
@@ -86,15 +88,28 @@ export function UserManagementPage() {
                     <td className="px-4 py-3 font-medium text-gray-900">{user.name}</td>
                     <td className="px-4 py-3 text-gray-600">{user.email}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
-                        {user.role}
-                      </span>
+                      {isEditing ? (
+                        <select
+                          value={editValues.role}
+                          onChange={(e) => setEditValues((v) => ({ ...v, role: e.target.value }))}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="EMPLOYEE">EMPLOYEE</option>
+                          <option value="MANAGER">MANAGER</option>
+                          <option value="HR_ADMIN">HR_ADMIN</option>
+                        </select>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
+                          {user.role}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {isEditing ? (
                         <input
                           type="text"
                           value={editValues.team}
+                          maxLength={100}
                           onChange={(e) =>
                             setEditValues((v) => ({ ...v, team: e.target.value }))
                           }
@@ -109,6 +124,7 @@ export function UserManagementPage() {
                         <input
                           type="text"
                           value={editValues.title}
+                          maxLength={100}
                           onChange={(e) =>
                             setEditValues((v) => ({ ...v, title: e.target.value }))
                           }

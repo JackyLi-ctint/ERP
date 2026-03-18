@@ -8,11 +8,11 @@ export const asyncHandler =
   (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
   (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch((error: Error) => {
-      if (error.message.match(/overlap/i)) {
+      if (error.message.match(/overlap|already exists/i)) {
         res.status(409).json({ message: error.message });
       } else if (
         error.message.match(
-          /Insufficient balance|working day|halfDay|start date|end date|Balance not found/i
+          /Insufficient balance|working day|halfDay|start date|end date|Balance not found|Semantic validation/i
         )
       ) {
         res.status(422).json({ message: error.message });
@@ -29,7 +29,8 @@ export const asyncHandler =
       } else if (error.message.match(/Validation error/)) {
         res.status(400).json({ message: error.message });
       } else {
-        res.status(500).json({ message: error.message });
+        console.error("Unhandled route error:", error);
+        res.status(500).json({ message: "An unexpected error occurred." });
       }
     });
   };

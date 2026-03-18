@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getPendingApprovals,
@@ -33,6 +34,7 @@ function RejectModal({ title, onConfirm, onCancel, isLoading }: RejectModalProps
         <textarea
           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           rows={3}
+          maxLength={1000}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Enter rejection reason…"
@@ -85,6 +87,11 @@ export function PendingApprovalsPage() {
       showFeedback("Request approved.");
     },
   });
+
+  function handleApprove(id: number) {
+    if (!window.confirm("Approve this request?")) return;
+    approveMutation.mutate(id);
+  }
 
   const rejectMutation = useMutation({
     mutationFn: ({ id, comment }: { id: number; comment: string }) =>
@@ -158,6 +165,7 @@ export function PendingApprovalsPage() {
                   "Start",
                   "End",
                   "Days",
+                  "Submitted",
                   "Status",
                   "Reason",
                   "Actions",
@@ -182,6 +190,7 @@ export function PendingApprovalsPage() {
                   <td className="px-4 py-3 text-gray-600">{formatDate(req.startDate)}</td>
                   <td className="px-4 py-3 text-gray-600">{formatDate(req.endDate)}</td>
                   <td className="px-4 py-3 text-gray-600">{req.totalDays}</td>
+                  <td className="px-4 py-3 text-gray-600">{new Date(req.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -197,10 +206,17 @@ export function PendingApprovalsPage() {
                     {req.reason ?? "—"}
                   </td>
                   <td className="px-4 py-3">
+                    <div className="flex flex-col space-y-1">
+                      <Link
+                        to={`/leave-requests/${req.id}/slip`}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                      >
+                        Slip
+                      </Link>
                     {req.status === "PENDING" && (
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => approveMutation.mutate(req.id)}
+                          onClick={() => handleApprove(req.id)}
                           disabled={approveMutation.isPending}
                           className="rounded bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
                         >
@@ -233,6 +249,7 @@ export function PendingApprovalsPage() {
                         </button>
                       </div>
                     )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -468,4 +468,18 @@ describe("POST /api/leave-requests (submit)", () => {
 
     expect(res.status).toBe(422);
   });
+
+  test("returns 400 when reason exceeds 500 characters", async () => {
+    const res = await request(app)
+      .post("/api/leave-requests")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({
+        leaveTypeId,
+        startDate: "2026-04-01",
+        endDate: "2026-04-01",
+        reason: "a".repeat(501),
+      });
+
+    expect(res.status).toBe(400);
+  });
 });

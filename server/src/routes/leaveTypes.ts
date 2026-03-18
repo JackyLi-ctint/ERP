@@ -1,42 +1,22 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
+import { asyncHandler } from "../lib/asyncHandler";
 
 const router = Router();
 
-// Error handling middleware for route handlers
-const asyncHandler =
-  (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch((error: Error) => {
-      if (error.message.includes("already exists")) {
-        res.status(409).json({ message: error.message });
-      } else if (error.message.includes("Semantic validation")) {
-        res.status(422).json({ message: error.message });
-      } else if (error.message.includes("Validation error")) {
-        res.status(400).json({ message: error.message });
-      } else if (error.message.includes("Forbidden")) {
-        res.status(403).json({ message: error.message });
-      } else if (error.message.includes("Not found")) {
-        res.status(404).json({ message: error.message });
-      } else {
-        res.status(500).json({ message: error.message });
-      }
-    });
-  };
-
 // Zod validation schemas
 const createLeaveTypeSchema = z.object({
-  name: z.string().min(1, "name is required"),
+  name: z.string().min(1, "name is required").max(100),
   defaultDays: z.number().positive("defaultDays must be greater than 0"),
   isCarryForward: z.boolean().optional().default(false),
   requiresDocument: z.boolean().optional().default(false),
 });
 
 const updateLeaveTypeSchema = z.object({
-  name: z.string().min(1).optional(),
+  name: z.string().min(1).max(100).optional(),
   defaultDays: z.number().positive().optional(),
   isCarryForward: z.boolean().optional(),
   requiresDocument: z.boolean().optional(),

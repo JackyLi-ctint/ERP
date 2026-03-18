@@ -30,7 +30,7 @@ const submitLeaveRequestSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "endDate must be in YYYY-MM-DD format"),
   halfDay: z.boolean().optional().default(false),
   period: z.enum(["AM", "PM"]).optional(),
-  reason: z.string().optional(),
+  reason: z.string().max(500, "reason must be at most 500 characters").optional(),
   attachmentUrl: z.string().url("attachmentUrl must be a valid URL").optional(),
 });
 

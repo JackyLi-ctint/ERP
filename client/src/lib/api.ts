@@ -227,6 +227,11 @@ export async function updateLeaveType(id: number, data: Partial<Omit<LeaveType, 
   return response.data.leaveType;
 }
 
+export async function reactivateLeaveType(id: number): Promise<LeaveType> {
+  const response = await apiClient.patch<{ leaveType: LeaveType }>(`/leave-types/${id}`, { isActive: true });
+  return response.data.leaveType;
+}
+
 // ─── Leave Balances ───────────────────────────────────────────────────────────
 
 export async function getLeaveBalances(): Promise<LeaveBalance[]> {
@@ -269,6 +274,11 @@ export async function updateUserIdentity(
   data: { team?: string; title?: string }
 ): Promise<User> {
   const response = await apiClient.patch<{ user: User }>(`/users/${id}/identity`, data);
+  return response.data.user;
+}
+
+export async function updateUserRole(id: string, role: string): Promise<User> {
+  const response = await apiClient.patch<{ user: User }>(`/users/${id}`, { role });
   return response.data.user;
 }
 

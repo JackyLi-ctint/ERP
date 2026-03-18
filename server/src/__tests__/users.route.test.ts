@@ -201,5 +201,65 @@ describe("users routes", () => {
       expect(updatedUser?.team).toBe("Team C");
       expect(updatedUser?.title).toBe("Senior Manager");
     });
+
+    test("returns 400 when team exceeds 100 characters", async () => {
+      const res = await request(app)
+        .patch(`/api/users/${targetUserId}/identity`)
+        .set("Authorization", `Bearer ${hrAdminToken}`)
+        .send({ team: "a".repeat(101) });
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe("PATCH /api/users/:id", () => {
+    test("should return 401 without auth", async () => {
+      const res = await request(app)
+        .patch(`/api/users/${targetUserId}`)
+        .send({ role: "MANAGER" });
+
+      expect(res.status).toBe(401);
+    });
+
+    test("should return 403 for MANAGER", async () => {
+      const res = await request(app)
+        .patch(`/api/users/${targetUserId}`)
+        .set("Authorization", `Bearer ${managerToken}`)
+        .send({ role: "MANAGER" });
+
+      expect(res.status).toBe(403);
+    });
+
+    test("should return 404 for non-existent user", async () => {
+      const res = await request(app)
+        .patch(`/api/users/non-existent-id`)
+        .set("Authorization", `Bearer ${hrAdminToken}`)
+        .send({ role: "MANAGER" });
+
+      expect(res.status).toBe(404);
+    });
+
+    test("should return 400 for invalid role value", async () => {
+      const res = await request(app)
+        .patch(`/api/users/${targetUserId}`)
+        .set("Authorization", `Bearer ${hrAdminToken}`)
+        .send({ role: "INVALID_ROLE" });
+
+      expect(res.status).toBe(400);
+    });
+
+    test("should return 200 and update role for HR_ADMIN", async () => {
+      const res = await request(app)
+        .patch(`/api/users/${targetUserId}`)
+        .set("Authorization", `Bearer ${hrAdminToken}`)
+        .send({ role: "MANAGER" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user).toBeDefined();
+      expect(res.body.user.role).toBe("MANAGER");
+
+      const updated = await prisma.user.findUnique({ where: { id: targetUserId } });
+      expect(updated?.role).toBe("MANAGER");
+    });
   });
 });

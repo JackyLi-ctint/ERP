@@ -16,7 +16,7 @@ const leaveApprovalRouter = Router();
 
 // Zod validation schemas
 const commentSchema = z.object({
-  comment: z.string().optional(),
+  comment: z.string().max(1000).optional(),
 });
 
 /**

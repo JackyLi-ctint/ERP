@@ -3,16 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import apiClient from "../../lib/api";
-
-interface LeaveType {
-  id: number;
-  name: string;
-  defaultDays: number;
-  isCarryForward: boolean;
-  requiresDocument: boolean;
-  isActive: boolean;
-}
+import {
+  getLeaveTypes,
+  createLeaveType,
+  updateLeaveType,
+  reactivateLeaveType,
+  LeaveType,
+} from "../../lib/api";
+import { AxiosError } from "axios";
 
 const leaveTypeSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -31,8 +29,7 @@ export default function LeaveTypesPage() {
 
   const { data, isLoading } = useQuery<{ leaveTypes: LeaveType[] }>({
     queryKey: ["leaveTypes"],
-    queryFn: () =>
-      (apiClient as any).get("/leave-types").then((r: any) => r.data),
+    queryFn: async () => ({ leaveTypes: await getLeaveTypes() }),
   });
 
   const {
@@ -47,26 +44,26 @@ export default function LeaveTypesPage() {
   const saveMutation = useMutation({
     mutationFn: (values: LeaveTypeFormValues) =>
       editingType
-        ? (apiClient as any)
-            .patch(`/leave-types/${editingType.id}`, values)
-            .then((r: any) => r.data)
-        : (apiClient as any)
-            .post("/leave-types", values)
-            .then((r: any) => r.data),
+        ? updateLeaveType(editingType.id, values)
+        : createLeaveType(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leaveTypes"] });
       closeDialog();
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.message ?? "Something went wrong");
+    onError: (err: AxiosError<{ message?: string }>) => {
+      setError(err.response?.data?.message ?? "Something went wrong");
     },
   });
 
   const deactivateMutation = useMutation({
-    mutationFn: (id: number) =>
-      (apiClient as any)
-        .delete(`/leave-types/${id}`)
-        .then((r: any) => r.data),
+    mutationFn: (id: number) => updateLeaveType(id, { isActive: false }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leaveTypes"] });
+    },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: number) => reactivateLeaveType(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leaveTypes"] });
     },
@@ -159,10 +156,25 @@ export default function LeaveTypesPage() {
                     </button>
                     {lt.isActive && (
                       <button
-                        onClick={() => deactivateMutation.mutate(lt.id)}
+                        onClick={() => {
+                          const ok = window.confirm(
+                            "Deactivate this leave type? Employees won't be able to submit new requests for it."
+                          );
+                          if (ok) {
+                            deactivateMutation.mutate(lt.id);
+                          }
+                        }}
                         className="text-red-500 hover:text-red-700 font-medium"
                       >
                         Deactivate
+                      </button>
+                    )}
+                    {!lt.isActive && (
+                      <button
+                        onClick={() => reactivateMutation.mutate(lt.id)}
+                        className="text-emerald-600 hover:text-emerald-800 font-medium"
+                      >
+                        Reactivate
                       </button>
                     )}
                   </td>
@@ -186,6 +198,7 @@ export default function LeaveTypesPage() {
                 <label className="block text-sm font-medium text-gray-700">Name</label>
                 <input
                   {...register("name")}
+                  maxLength={100}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
                 {errors.name && (
