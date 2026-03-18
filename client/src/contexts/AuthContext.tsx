@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import {
   authApi,
   setAccessToken,
@@ -17,6 +17,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isInitializing: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => void;
@@ -25,40 +26,65 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const REFRESH_TOKEN_KEY = "refreshToken";
+
 export interface AuthProviderProps {
   children: React.ReactNode;
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
-  const [_refreshToken, setRefreshToken] = useState<string | null>(null);
-
-  const login = useCallback(async (credentials: LoginRequest) => {
-    try {
-      const response: AuthResponse = await authApi.login(credentials);
-      setUser(response.user);
-      setAccessToken(response.accessToken);
-      setRefreshToken(response.refreshToken);
-    } catch (error) {
-      throw error;
-    }
-  }, []);
-
-  const register = useCallback(async (data: RegisterRequest) => {
-    try {
-      const response: AuthResponse = await authApi.register(data);
-      setUser(response.user);
-      setAccessToken(response.accessToken);
-      setRefreshToken(response.refreshToken);
-    } catch (error) {
-      throw error;
-    }
-  }, []);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const logout = useCallback(() => {
     setUser(null);
     setAccessToken(null);
-    setRefreshToken(null);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  }, []);
+
+  // On mount, attempt to restore session from stored refresh token
+  useEffect(() => {
+    const stored = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!stored) {
+      setIsInitializing(false);
+      return;
+    }
+    authApi
+      .refresh(stored)
+      .then((response: AuthResponse) => {
+        setUser(response.user);
+        setAccessToken(response.accessToken);
+        if (response.refreshToken) {
+          localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+      })
+      .finally(() => {
+        setIsInitializing(false);
+      });
+  }, []);
+
+  // Listen for auth:expired event dispatched by the 401 interceptor
+  useEffect(() => {
+    const handleExpired = () => logout();
+    window.addEventListener("auth:expired", handleExpired);
+    return () => window.removeEventListener("auth:expired", handleExpired);
+  }, [logout]);
+
+  const login = useCallback(async (credentials: LoginRequest) => {
+    const response: AuthResponse = await authApi.login(credentials);
+    setUser(response.user);
+    setAccessToken(response.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
+  }, []);
+
+  const register = useCallback(async (data: RegisterRequest) => {
+    const response: AuthResponse = await authApi.register(data);
+    setUser(response.user);
+    setAccessToken(response.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
   }, []);
 
   const refreshAuth = useCallback(async (token: string) => {
@@ -66,9 +92,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response: AuthResponse = await authApi.refresh(token);
       setUser(response.user);
       setAccessToken(response.accessToken);
-      setRefreshToken(response.refreshToken);
+      if (response.refreshToken) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
+      }
     } catch (error) {
-      // If refresh fails, clear auth
       logout();
       throw error;
     }
@@ -77,6 +104,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
+    isInitializing,
     login,
     register,
     logout,
