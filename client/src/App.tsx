@@ -14,8 +14,11 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { ApplyLeavePage } from "./pages/employee/ApplyLeavePage";
 import LeaveTypesPage from "./pages/admin/LeaveTypesPage";
 import { UserManagementPage } from "./pages/admin/UserManagementPage";
+import { HRRecordsPage } from "./pages/admin/HRRecordsPage";
+import { BalanceAdminPage } from "./pages/admin/BalanceAdminPage";
 import { PendingApprovalsPage } from "./pages/manager/PendingApprovalsPage";
 import { LeaveCalendarPage } from "./pages/LeaveCalendarPage";
+import { LeaveSlipPage } from "./pages/LeaveSlipPage";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +97,39 @@ function AppContent() {
           <ProtectedRoute>
             <AuthenticatedLayout>
               <LeaveCalendarPage />
+            </AuthenticatedLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/leave-requests/:id/slip"
+        element={
+          <ProtectedRoute>
+            <AuthenticatedLayout>
+              <LeaveSlipPage />
+            </AuthenticatedLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/leave-records"
+        element={
+          <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+            <AuthenticatedLayout>
+              <HRRecordsPage />
+            </AuthenticatedLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/balances"
+        element={
+          <ProtectedRoute allowedRoles={["HR_ADMIN"]}>
+            <AuthenticatedLayout>
+              <BalanceAdminPage />
             </AuthenticatedLayout>
           </ProtectedRoute>
         }

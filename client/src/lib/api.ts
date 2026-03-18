@@ -50,11 +50,14 @@ export interface LeaveRequest {
 }
 
 export interface LeaveBalance {
+  id: number;
+  userId: string;
   leaveTypeId: number;
+  year: number;
+  totalDays: number;
+  usedDays: number;
+  pendingDays: number;
   leaveType: { id: number; name: string };
-  entitlement: number;
-  used: number;
-  remaining: number;
 }
 
 export interface PendingRequest {
@@ -227,7 +230,7 @@ export async function updateLeaveType(id: number, data: Partial<Omit<LeaveType, 
 // ─── Leave Balances ───────────────────────────────────────────────────────────
 
 export async function getLeaveBalances(): Promise<LeaveBalance[]> {
-  const response = await apiClient.get<{ leaveBalances: LeaveBalance[] }>("/me/leave-balances");
+  const response = await apiClient.get<{ leaveBalances: LeaveBalance[] }>("/me/balances");
   return response.data.leaveBalances;
 }
 
@@ -286,5 +289,90 @@ export const getLeaveCalendar = (year: number, month: number): Promise<CalendarE
   apiClient
     .get<{ leaveRequests: CalendarEntry[] }>(`/leave-calendar?year=${year}&month=${month}`)
     .then((r) => r.data.leaveRequests);
+
+// ─── Leave Request Detail ─────────────────────────────────────────────────────
+
+export interface LeaveRequestDetail {
+  id: number;
+  employeeId: string;
+  employeeName: string;
+  leaveTypeName: string;
+  startDate: string;
+  endDate: string;
+  halfDay: boolean;
+  period?: string;
+  totalDays: number;
+  reason?: string;
+  status: string;
+  approvedById?: string;
+  approverComment?: string;
+  createdAt: string;
+}
+
+export const getLeaveRequest = (id: number): Promise<LeaveRequestDetail> =>
+  apiClient.get<{ leaveRequest: LeaveRequestDetail }>(`/leave-requests/${id}`).then(r => r.data.leaveRequest);
+
+// ─── Admin Leave Requests ─────────────────────────────────────────────────────
+
+export interface AdminLeaveRequest {
+  id: number;
+  employeeId: string;
+  employeeName: string;
+  leaveTypeName: string;
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  status: string;
+  reason?: string;
+  approvedById?: string;
+  approverComment?: string;
+  createdAt: string;
+}
+
+export const getAdminLeaveRequests = (params: {
+  employeeId?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<{ leaveRequests: AdminLeaveRequest[]; total: number; page: number; pageSize: number }> => {
+  const query = new URLSearchParams();
+  if (params.employeeId) query.set("employeeId", params.employeeId);
+  if (params.status) query.set("status", params.status);
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  if (params.page) query.set("page", String(params.page));
+  if (params.pageSize) query.set("pageSize", String(params.pageSize));
+  return apiClient.get(`/admin/leave-requests?${query}`).then(r => r.data);
+};
+
+// ─── Admin Balances ───────────────────────────────────────────────────────────
+
+export interface BalanceRow {
+  id: number;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  leaveTypeId: number;
+  leaveTypeName: string;
+  year: number;
+  totalDays: number;
+  usedDays: number;
+  pendingDays: number;
+}
+
+export const getAdminBalances = (params: { year?: number; userId?: string }): Promise<{ balances: BalanceRow[] }> => {
+  const query = new URLSearchParams();
+  if (params.year) query.set("year", String(params.year));
+  if (params.userId) query.set("userId", params.userId);
+  return apiClient.get(`/admin/balances?${query}`).then(r => r.data);
+};
+
+export const initBalances = (year: number): Promise<{ created: number; skipped: number }> =>
+  apiClient.post("/admin/balances/init", { year }).then(r => r.data);
+
+export const carryForwardBalances = (fromYear: number, toYear: number): Promise<{ carried: number; skipped: number }> =>
+  apiClient.post("/admin/balances/carry-forward", { fromYear, toYear }).then(r => r.data);
 
 export default apiClient;

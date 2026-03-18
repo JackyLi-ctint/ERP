@@ -56,6 +56,18 @@ export function Navbar() {
                 Users
               </NavLink>
             )}
+
+            {role === "HR_ADMIN" && (
+              <NavLink to="/admin/leave-records" className={linkClass}>
+                Leave Records
+              </NavLink>
+            )}
+
+            {role === "HR_ADMIN" && (
+              <NavLink to="/admin/balances" className={linkClass}>
+                Balances
+              </NavLink>
+            )}
           </div>
 
           {/* Right: user info + logout */}
