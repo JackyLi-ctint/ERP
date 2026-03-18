@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { LeaveStatus } from "@prisma/client";
 import prisma from "../lib/prisma";
@@ -8,37 +8,13 @@ import {
   cancelLeaveRequest,
   getLeaveRequestsForUser,
 } from "../services/leaveRequest.service";
+import { asyncHandler } from "../lib/asyncHandler";
 
 // Router for POST/DELETE – mounted at /api/leave-requests
 const leaveRequestsRouter = Router();
 
 // Router for GET – mounted at /api/me/leave-requests
 const meLeaveRequestsRouter = Router();
-
-// Error handling middleware for route handlers
-const asyncHandler =
-  (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch((error: Error) => {
-      if (error.message.match(/overlap/i)) {
-        res.status(409).json({ message: error.message });
-      } else if (
-        error.message.match(/Insufficient balance|working day|halfDay|start date|end date|Balance not found/i)
-      ) {
-        res.status(422).json({ message: error.message });
-      } else if (error.message.match(/Forbidden/)) {
-        res.status(403).json({ message: error.message });
-      } else if (
-        error.message.match(/not found|Not found/)
-      ) {
-        res.status(404).json({ message: error.message });
-      } else if (error.message.match(/Cannot cancel/)) {
-        res.status(422).json({ message: error.message });
-      } else {
-        res.status(500).json({ message: error.message });
-      }
-    });
-  };
 
 // Zod validation schemas
 const submitLeaveRequestSchema = z.object({
