@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+  HR_ADMIN
+}
+
+model User {
+  id          String     @id @default(cuid())
+  name        String
+  email       String     @unique
+  passwordHash String
+  role        Role       @default(EMPLOYEE)
+  
+  // Self-referential FK for approval chain
+  approverId  String?
+  approver    User?      @relation("UserApprover", fields: [approverId], references: [id])
+  subordinates User[]    @relation("UserApprover")
+  
+  department  String?
+  
+  // Microsoft Entra ID / Azure AD integration
+  msEntraOid  String?    @unique
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  // Audit log reference
+  auditLogs   AuditLog[] @relation("ActorAuditLog")
+  
+  // Leave management - created leave types and leave balances
+  leaveTypesCreated LeaveType[]
+  leaveBalances     LeaveBalance[]
+  
+  @@index([email])
+  @@index([role])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  actor     User     @relation("ActorAuditLog", fields: [actorId], references: [id])
+  action    String
+  entityType String
+  entityId  String
+  before    Json?
+  after     Json?
+  timestamp DateTime @default(now())
+  
+  @@index([actorId])
+  @@index([timestamp])
+  @@index([entityType, entityId])
+}
+
+model PublicHoliday {
+  id   Int    @id @default(autoincrement())
+  date DateTime @db.Date
+  name String
+  year Int
+  @@unique([date])
+  @@index([year])
+}
+
+model LeaveType {
+  id               Int            @id @default(autoincrement())
+  name             String         @unique
+  defaultDays      Float
+  isCarryForward   Boolean        @default(false)
+  requiresDocument Boolean        @default(false)
+  isActive         Boolean        @default(true)
+  createdById      String
+  createdBy        User           @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  balances         LeaveBalance[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model LeaveBalance {
+  id            Int       @id @default(autoincrement())
+  userId        String
+  leaveTypeId   Int
+  year          Int
+  totalDays     Float
+  usedDays      Float     @default(0)
+  pendingDays   Float     @default(0)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaveType     LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  @@unique([userId, leaveTypeId, year])
+}
