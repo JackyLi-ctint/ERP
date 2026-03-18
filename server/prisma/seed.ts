@@ -69,7 +69,7 @@ async function main() {
 
   console.log("Creating demo users...");
 
-  // Create HR Admin 1 (self-approval allowed)
+  // Create HR Admin 1
   const hrAdmin1 = await prisma.user.create({
     data: {
       name: "Alice HR Admin",
@@ -77,17 +77,11 @@ async function main() {
       passwordHash: await bcrypt.hash("SecurePass123", 12),
       role: Role.HR_ADMIN,
       department: "Human Resources",
-      approverId: undefined, // Will be set to self after creation
+      team: null,
     },
   });
 
-  // Update HR Admin 1 to self-reference
-  await prisma.user.update({
-    where: { id: hrAdmin1.id },
-    data: { approverId: hrAdmin1.id },
-  });
-
-  // Create HR Admin 2 (self-approval allowed)
+  // Create HR Admin 2
   const hrAdmin2 = await prisma.user.create({
     data: {
       name: "Bob HR Admin",
@@ -95,17 +89,11 @@ async function main() {
       passwordHash: await bcrypt.hash("SecurePass456", 12),
       role: Role.HR_ADMIN,
       department: "Human Resources",
-      approverId: undefined,
+      team: null,
     },
   });
 
-  // Update HR Admin 2 to self-reference
-  await prisma.user.update({
-    where: { id: hrAdmin2.id },
-    data: { approverId: hrAdmin2.id },
-  });
-
-  // Create Manager (approval chain points to HR Admin 1)
+  // Create Manager
   const manager = await prisma.user.create({
     data: {
       name: "Charlie Manager",
@@ -113,11 +101,11 @@ async function main() {
       passwordHash: await bcrypt.hash("SecurePass789", 12),
       role: Role.MANAGER,
       department: "Engineering",
-      approverId: hrAdmin1.id,
+      team: "Engineering",
     },
   });
 
-  // Create Employee 1 (approver is Manager)
+  // Create Employee 1
   const employee1 = await prisma.user.create({
     data: {
       name: "Diana Employee",
@@ -125,11 +113,11 @@ async function main() {
       passwordHash: await bcrypt.hash("SecurePass012", 12),
       role: Role.EMPLOYEE,
       department: "Engineering",
-      approverId: manager.id,
+      team: "Engineering",
     },
   });
 
-  // Create Employee 2 (approver is Manager)
+  // Create Employee 2
   const employee2 = await prisma.user.create({
     data: {
       name: "Eve Employee",
@@ -137,16 +125,16 @@ async function main() {
       passwordHash: await bcrypt.hash("SecurePass345", 12),
       role: Role.EMPLOYEE,
       department: "Engineering",
-      approverId: manager.id,
+      team: "Engineering",
     },
   });
 
   console.log("Demo users created successfully:");
-  console.log(`- HR Admin 1: ${hrAdmin1.email} (self-approval)`);
-  console.log(`- HR Admin 2: ${hrAdmin2.email} (self-approval)`);
-  console.log(`- Manager: ${manager.email} -> approves: ${hrAdmin1.email}`);
-  console.log(`- Employee 1: ${employee1.email} -> approves: ${manager.email}`);
-  console.log(`- Employee 2: ${employee2.email} -> approves: ${manager.email}`);
+  console.log(`- HR Admin 1: ${hrAdmin1.email}`);
+  console.log(`- HR Admin 2: ${hrAdmin2.email}`);
+  console.log(`- Manager: ${manager.email} (Engineering team)`);
+  console.log(`- Employee 1: ${employee1.email} (Engineering team)`);
+  console.log(`- Employee 2: ${employee2.email} (Engineering team)`);
 
   // Seed HK public holidays
   console.log("Seeding HK public holidays...");

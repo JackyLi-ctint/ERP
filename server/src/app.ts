@@ -59,3 +59,6 @@ export function createApp() {
 
   return app;
 }
+
+// Default export for convenience (e.g., in tests)
+export default createApp();

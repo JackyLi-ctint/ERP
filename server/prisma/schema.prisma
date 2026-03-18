@@ -16,6 +16,15 @@ enum Role {
   HR_ADMIN
 }
 
+enum LeaveStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCEL_REQUESTED
+  CANCELLED
+}
+
 model User {
   id          String     @id @default(cuid())
   name        String
@@ -23,11 +32,8 @@ model User {
   passwordHash String
   role        Role       @default(EMPLOYEE)
   
-  // Self-referential FK for approval chain
-  approverId  String?
-  approver    User?      @relation("UserApprover", fields: [approverId], references: [id])
-  subordinates User[]    @relation("UserApprover")
-  
+  team        String?
+  title       String?
   department  String?
   
   // Microsoft Entra ID / Azure AD integration
@@ -42,9 +48,12 @@ model User {
   // Leave management - created leave types and leave balances
   leaveTypesCreated LeaveType[]
   leaveBalances     LeaveBalance[]
+  leaveRequests     LeaveRequest[]
+  approvedRequests  LeaveRequest[] @relation("LeaveApprover")
   
   @@index([email])
   @@index([role])
+  @@index([team])
 }
 
 model AuditLog {
@@ -81,6 +90,7 @@ model LeaveType {
   isActive         Boolean        @default(true)
   createdById      String
   createdBy        User           @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  requests         LeaveRequest[]
   balances         LeaveBalance[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
@@ -99,4 +109,27 @@ model LeaveBalance {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   @@unique([userId, leaveTypeId, year])
+}
+
+model LeaveRequest {
+  id             Int         @id @default(autoincrement())
+  employeeId     String
+  leaveTypeId    Int
+  startDate      DateTime    @db.Date
+  endDate        DateTime    @db.Date
+  halfDay        Boolean     @default(false)
+  period         String?     // "AM" | "PM" — only set when halfDay=true
+  totalDays      Float
+  reason         String?
+  attachmentUrl  String?
+  status         LeaveStatus @default(PENDING)
+  approvedById   String?
+  approverComment String?
+  employee       User        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType      LeaveType   @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  approvedBy     User?       @relation("LeaveApprover", fields: [approvedById], references: [id])
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  @@index([employeeId])
+  @@index([status])
 }
