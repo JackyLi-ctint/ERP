@@ -11,6 +11,7 @@ import { usersRouter } from "./users";
 import { leaveCalendarRouter } from "./leaveCalendar";
 import { adminLeaveRequestsRouter } from "./adminLeaveRequests";
 import { adminBalancesRouter } from "./adminBalances";
+import { adminAuditLogsRouter } from "./adminAuditLogs";
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use("/users", usersRouter);
 router.use("/leave-calendar", leaveCalendarRouter);
 router.use("/admin/leave-requests", adminLeaveRequestsRouter);
 router.use("/admin/balances", adminBalancesRouter);
+router.use("/admin/audit-logs", adminAuditLogsRouter);
 
 export default router;

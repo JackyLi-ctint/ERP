@@ -10,7 +10,7 @@ import {
 } from "../services/leaveRequest.service";
 import { asyncHandler } from "../lib/asyncHandler";
 
-// Router for POST/DELETE – mounted at /api/leave-requests
+// Router for POST/PATCH – mounted at /api/leave-requests
 const leaveRequestsRouter = Router();
 
 // Router for GET – mounted at /api/me/leave-requests
@@ -32,6 +32,10 @@ const submitLeaveRequestSchema = z.object({
   period: z.enum(["AM", "PM"]).optional(),
   reason: z.string().max(500, "reason must be at most 500 characters").optional(),
   attachmentUrl: z.string().url("attachmentUrl must be a valid URL").optional(),
+});
+
+const cancelLeaveRequestSchema = z.object({
+  reason: z.string().max(500, "reason must be at most 500 characters").optional(),
 });
 
 /**
@@ -127,13 +131,14 @@ meLeaveRequestsRouter.get(
 );
 
 /**
- * DELETE /api/leave-requests/:id
+ * PATCH /api/leave-requests/:id/cancel
  * Cancel a leave request (owner only)
  * Accessible by: owner of the request
+ * Body: { reason?: string } (optional cancellation reason, max 500 chars)
  * Returns: 200 with { leaveRequest }
  */
-leaveRequestsRouter.delete(
-  "/:id",
+leaveRequestsRouter.patch(
+  "/:id/cancel",
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const requestId = parseInt(req.params.id as string);
@@ -144,7 +149,24 @@ leaveRequestsRouter.delete(
       return;
     }
 
-    const updatedRequest = await cancelLeaveRequest(requestId, userId, prisma);
+    const validation = cancelLeaveRequestSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      res.status(400).json({
+        message: "Validation error",
+        errors: validation.error.flatten(),
+      });
+      return;
+    }
+
+    const data = validation.data;
+
+    const updatedRequest = await cancelLeaveRequest(
+      requestId,
+      userId,
+      prisma,
+      data.reason
+    );
 
     res.json({ leaveRequest: updatedRequest });
   })

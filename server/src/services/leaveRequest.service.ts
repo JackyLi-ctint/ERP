@@ -1,5 +1,6 @@
 import { PrismaClient, LeaveRequest } from "@prisma/client";
 import { countWorkingDays, getHolidaySet } from "./workingDays.service";
+import { sendNewLeaveRequestEmail } from "./email.service";
 
 /**
  * Submit a new leave request
@@ -175,6 +176,49 @@ export async function submitLeaveRequest(
     return leaveRequest;
   });
 
+  // Fetch employee and send notifications to managers/HR (outside transaction)
+  try {
+    const employee = await prisma.user.findUnique({
+      where: { id: data.employeeId },
+    });
+
+    if (employee) {
+      // Query managers in the same team
+      const managers = await prisma.user.findMany({
+        where: {
+          role: "MANAGER",
+          team: employee.team,
+        },
+        select: { email: true },
+      });
+
+      // Query all HR_ADMIN users
+      const hrAdmins = await prisma.user.findMany({
+        where: { role: "HR_ADMIN" },
+        select: { email: true },
+      });
+
+      // Combine manager and HR_ADMIN emails
+      const managerEmails = [...managers, ...hrAdmins].map((u) => u.email);
+
+      if (managerEmails.length > 0) {
+        const startDate = result.startDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+        const endDate = result.endDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+
+        await sendNewLeaveRequestEmail(
+          managerEmails,
+          employee.name,
+          result.leaveType.name,
+          startDate,
+          endDate
+        );
+      }
+    }
+  } catch (error) {
+    // Log but don't throw - email failure shouldn't break the request submission
+    console.error("[Leave Request] Failed to send new leave request notification:", error);
+  }
+
   return result;
 }
 
@@ -188,7 +232,8 @@ export async function submitLeaveRequest(
 export async function cancelLeaveRequest(
   requestId: number,
   userId: string,
-  prisma: PrismaClient
+  prisma: PrismaClient,
+  cancellationReason?: string
 ): Promise<LeaveRequest> {
   // Find the request
   const request = await prisma.leaveRequest.findUnique({
@@ -218,6 +263,7 @@ export async function cancelLeaveRequest(
         where: { id: requestId },
         data: {
           status: "CANCELLED",
+          cancellationReason: cancellationReason || null,
         },
         include: {
           leaveType: true,
@@ -250,7 +296,10 @@ export async function cancelLeaveRequest(
   if (request.status === "APPROVED") {
     return prisma.leaveRequest.update({
       where: { id: requestId },
-      data: { status: "CANCEL_REQUESTED" },
+      data: {
+        status: "CANCEL_REQUESTED",
+        cancellationReason: cancellationReason || null,
+      },
       include: { leaveType: true },
     });
   }

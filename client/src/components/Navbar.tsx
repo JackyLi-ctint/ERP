@@ -68,6 +68,12 @@ export function Navbar() {
                 Balances
               </NavLink>
             )}
+
+            {role === "HR_ADMIN" && (
+              <NavLink to="/admin/audit-logs" className={linkClass}>
+                Audit Log
+              </NavLink>
+            )}
           </div>
 
           {/* Right: user info + logout */}

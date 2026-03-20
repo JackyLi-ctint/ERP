@@ -1,4 +1,5 @@
 import { PrismaClient, Role, LeaveStatus, LeaveRequest, User } from "@prisma/client";
+import { sendLeaveApprovedEmail, sendLeaveRejectedEmail } from "./email.service";
 
 type TxClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -44,10 +45,10 @@ export async function approveLeaveRequest(
   comment: string | undefined,
   prisma: PrismaClient
 ): Promise<LeaveRequest> {
-  // Find request with employee relation
+  // Find request with employee and leaveType relations
   const request = await prisma.leaveRequest.findUnique({
     where: { id },
-    include: { employee: true },
+    include: { employee: true, leaveType: true },
   });
 
   if (!request) {
@@ -109,6 +110,23 @@ export async function approveLeaveRequest(
     return updated;
   });
 
+  // Send approval email (outside transaction, failure doesn't break approval)
+  try {
+    const startDate = request.startDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    const endDate = request.endDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    
+    await sendLeaveApprovedEmail(
+      request.employee.name,
+      request.employee.email,
+      request.leaveType.name,
+      startDate,
+      endDate
+    );
+  } catch (error) {
+    // Log but don't throw - email failure shouldn't break the approval
+    console.error("[Leave Approval] Failed to send approval email:", error);
+  }
+
   return result;
 }
 
@@ -124,10 +142,10 @@ export async function rejectLeaveRequest(
   comment: string,
   prisma: PrismaClient
 ): Promise<LeaveRequest> {
-  // Find request with employee relation
+  // Find request with employee and leaveType relations
   const request = await prisma.leaveRequest.findUnique({
     where: { id },
-    include: { employee: true },
+    include: { employee: true, leaveType: true },
   });
 
   if (!request) {
@@ -192,6 +210,24 @@ export async function rejectLeaveRequest(
 
     return updated;
   });
+
+  // Send rejection email (outside transaction, failure doesn't break rejection)
+  try {
+    const startDate = request.startDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    const endDate = request.endDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    
+    await sendLeaveRejectedEmail(
+      request.employee.name,
+      request.employee.email,
+      request.leaveType.name,
+      startDate,
+      endDate,
+      comment
+    );
+  } catch (error) {
+    // Log but don't throw - email failure shouldn't break the rejection
+    console.error("[Leave Approval] Failed to send rejection email:", error);
+  }
 
   return result;
 }
@@ -393,4 +429,196 @@ export async function getSubordinatePendingRequests(
       createdAt: "asc",
     },
   });
+}
+
+/**
+ * Bulk approve multiple leave requests
+ * Validates: ids array is not empty
+ * For each id, validates actor eligibility (same logic as approveLeaveRequest)
+ * Uses prisma.$transaction for atomicity
+ * Returns array of approved leave requests
+ */
+export async function bulkApproveLeaveRequests(
+  ids: number[],
+  actorId: string,
+  actorRole: Role,
+  comment: string | undefined,
+  prisma: PrismaClient
+): Promise<LeaveRequest[]> {
+  // Validate ids array is not empty
+  if (!ids || ids.length === 0) {
+    throw new Error("No request IDs provided");
+  }
+
+  // Find all requests with employee relation
+  const requests = await prisma.leaveRequest.findMany({
+    where: { id: { in: ids } },
+    include: { employee: true },
+  });
+
+  // Validate all requests exist
+  if (requests.length !== ids.length) {
+    throw new Error("One or more leave requests not found");
+  }
+
+  // Self-approval check (sync, outside tx)
+  for (const request of requests) {
+    assertNotSelfApproval(request, actorId);
+    if (request.status !== "PENDING") {
+      throw new Error(`Cannot approve: request ${request.id} is not PENDING`);
+    }
+  }
+
+  // Execute all approvals in a single transaction
+  const result = await prisma.$transaction(async (tx: TxClient) => {
+    const approved: LeaveRequest[] = [];
+
+    for (const request of requests) {
+      // Validate team authorization inside transaction
+      await assertTeamAuthorization(request, actorId, actorRole, tx);
+
+      const year = request.startDate.getUTCFullYear();
+
+      // Update request
+      const updated = await tx.leaveRequest.update({
+        where: { id: request.id },
+        data: {
+          status: "APPROVED" as LeaveStatus,
+          approvedById: actorId,
+          approverComment: comment,
+        },
+      });
+
+      // Update balance
+      await tx.leaveBalance.update({
+        where: {
+          userId_leaveTypeId_year: {
+            userId: request.employeeId,
+            leaveTypeId: request.leaveTypeId,
+            year,
+          },
+        },
+        data: {
+          pendingDays: { decrement: request.totalDays },
+          usedDays: { increment: request.totalDays },
+        },
+      });
+
+      // Record audit log
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: "APPROVE",
+          entityType: "LeaveRequest",
+          entityId: String(request.id),
+          before: { status: "PENDING" },
+          after: { status: "APPROVED" },
+        },
+      });
+
+      approved.push(updated);
+    }
+
+    return approved;
+  });
+
+  return result;
+}
+
+/**
+ * Bulk reject multiple leave requests
+ * Validates: ids array is not empty, comment is required and not empty
+ * For each id, validates actor eligibility (same logic as rejectLeaveRequest)
+ * Uses prisma.$transaction for atomicity
+ * Returns array of rejected leave requests
+ */
+export async function bulkRejectLeaveRequests(
+  ids: number[],
+  comment: string,
+  actorId: string,
+  actorRole: Role,
+  prisma: PrismaClient
+): Promise<LeaveRequest[]> {
+  // Validate ids array is not empty
+  if (!ids || ids.length === 0) {
+    throw new Error("No request IDs provided");
+  }
+
+  // Validate comment is required
+  if (!comment || comment.trim() === "") {
+    throw new Error("Comment is required for rejection");
+  }
+
+  // Find all requests with employee relation
+  const requests = await prisma.leaveRequest.findMany({
+    where: { id: { in: ids } },
+    include: { employee: true },
+  });
+
+  // Validate all requests exist
+  if (requests.length !== ids.length) {
+    throw new Error("One or more leave requests not found");
+  }
+
+  // Self-approval check (sync, outside tx)
+  for (const request of requests) {
+    assertNotSelfApproval(request, actorId);
+    if (request.status !== "PENDING") {
+      throw new Error(`Cannot reject: request ${request.id} is not PENDING`);
+    }
+  }
+
+  // Execute all rejections in a single transaction
+  const result = await prisma.$transaction(async (tx: TxClient) => {
+    const rejected: LeaveRequest[] = [];
+
+    for (const request of requests) {
+      // Validate team authorization inside transaction
+      await assertTeamAuthorization(request, actorId, actorRole, tx);
+
+      const year = request.startDate.getUTCFullYear();
+
+      // Update request
+      const updated = await tx.leaveRequest.update({
+        where: { id: request.id },
+        data: {
+          status: "REJECTED" as LeaveStatus,
+          approvedById: actorId,
+          approverComment: comment,
+        },
+      });
+
+      // Update balance - only decrement pendingDays
+      await tx.leaveBalance.update({
+        where: {
+          userId_leaveTypeId_year: {
+            userId: request.employeeId,
+            leaveTypeId: request.leaveTypeId,
+            year,
+          },
+        },
+        data: {
+          pendingDays: { decrement: request.totalDays },
+        },
+      });
+
+      // Record audit log
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: "REJECT",
+          entityType: "LeaveRequest",
+          entityId: String(request.id),
+          before: { status: "PENDING" },
+          after: { status: "REJECTED" },
+        },
+      });
+
+      rejected.push(updated);
+    }
+
+    return rejected;
+  });
+
+  return result;
 }

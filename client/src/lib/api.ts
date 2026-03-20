@@ -44,6 +44,7 @@ export interface LeaveRequest {
   halfDay: boolean;
   period?: string;
   reason?: string;
+  cancellationReason?: string;
   status: string;
   leaveType: { id: number; name: string };
   createdAt: string;
@@ -71,7 +72,7 @@ export interface PendingRequest {
   reason?: string;
   status: string;
   leaveType: { id: number; name: string };
-  user: { id: string; name: string; email: string };
+  employee: { id: string; name: string; email: string };
   createdAt: string;
 }
 
@@ -82,6 +83,7 @@ export interface User {
   role: string;
   team?: string;
   title?: string;
+  department?: string;
 }
 
 // ─── Axios instance ───────────────────────────────────────────────────────────
@@ -206,8 +208,8 @@ export async function submitLeaveRequest(data: {
   return response.data.leaveRequest;
 }
 
-export async function cancelLeaveRequest(id: number): Promise<void> {
-  await apiClient.delete(`/leave-requests/${id}`);
+export async function cancelLeaveRequest(id: number, reason?: string): Promise<void> {
+  await apiClient.patch(`/leave-requests/${id}/cancel`, { reason });
 }
 
 // ─── Leave Types ──────────────────────────────────────────────────────────────
@@ -262,6 +264,14 @@ export async function rejectCancellation(id: number, comment: string): Promise<v
   await apiClient.post(`/leave-requests/${id}/reject-cancellation`, { comment });
 }
 
+export async function bulkApproveLeaveRequests(ids: number[], comment?: string): Promise<void> {
+  await apiClient.post("/leave-requests/bulk-approve", { ids, comment });
+}
+
+export async function bulkRejectLeaveRequests(ids: number[], comment: string): Promise<void> {
+  await apiClient.post("/leave-requests/bulk-reject", { ids, comment });
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export async function getUsers(): Promise<User[]> {
@@ -269,17 +279,46 @@ export async function getUsers(): Promise<User[]> {
   return response.data.users;
 }
 
-export async function updateUserIdentity(
-  id: string,
-  data: { team?: string; title?: string }
-): Promise<User> {
-  const response = await apiClient.patch<{ user: User }>(`/users/${id}/identity`, data);
+export async function createUser(data: {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  team?: string;
+  title?: string;
+  department?: string;
+}): Promise<User> {
+  const response = await apiClient.post<{ user: User }>("/users", data);
   return response.data.user;
 }
 
-export async function updateUserRole(id: string, role: string): Promise<User> {
-  const response = await apiClient.patch<{ user: User }>(`/users/${id}`, { role });
+export async function updateUser(
+  id: string,
+  data: {
+    name?: string;
+    email?: string;
+    password?: string;
+    role?: string;
+    team?: string;
+    title?: string;
+    department?: string;
+  }
+): Promise<User> {
+  const response = await apiClient.patch<{ user: User }>(`/users/${id}`, data);
   return response.data.user;
+}
+
+export async function importUsersFromCSV(file: File): Promise<{
+  created: number;
+  skipped: number;
+  errors: Array<{ row: number; message: string }>;
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await apiClient.post("/users/import", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data;
 }
 
 // ─── Leave Calendar ───────────────────────────────────────────────────────────
@@ -384,5 +423,48 @@ export const initBalances = (year: number): Promise<{ created: number; skipped: 
 
 export const carryForwardBalances = (fromYear: number, toYear: number): Promise<{ carried: number; skipped: number }> =>
   apiClient.post("/admin/balances/carry-forward", { fromYear, toYear }).then(r => r.data);
+
+export const patchAdminBalance = (id: number, totalDays: number): Promise<{ balance: BalanceRow }> =>
+  apiClient.patch(`/admin/balances/${id}`, { totalDays }).then(r => r.data);
+
+// ─── Admin Audit Logs ─────────────────────────────────────────────────────────
+
+export interface AuditLog {
+  id: string;
+  actorId: string;
+  actor: { id: string; name: string; email: string };
+  action: string;
+  entityType: string;
+  entityId: string;
+  before: unknown;
+  after: unknown;
+  timestamp: string;
+}
+
+export interface AuditLogsResponse {
+  logs: AuditLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export async function getAuditLogs(params: {
+  from?: string;
+  to?: string;
+  entityType?: string;
+  actorId?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<AuditLogsResponse> {
+  const query = new URLSearchParams();
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  if (params.entityType) query.set("entityType", params.entityType);
+  if (params.actorId) query.set("actorId", params.actorId);
+  if (params.page) query.set("page", String(params.page));
+  if (params.pageSize) query.set("pageSize", String(params.pageSize));
+  return apiClient.get<AuditLogsResponse>(`/admin/audit-logs?${query}`).then(r => r.data);
+}
 
 export default apiClient;

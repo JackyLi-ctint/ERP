@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -7,6 +7,8 @@ import {
   rejectLeaveRequest,
   approveCancellation,
   rejectCancellation,
+  bulkApproveLeaveRequests,
+  bulkRejectLeaveRequests,
   PendingRequest,
 } from "../../lib/api";
 
@@ -63,17 +65,24 @@ function RejectModal({ title, onConfirm, onCancel, isLoading }: RejectModalProps
 type ModalState =
   | { type: "reject"; id: number }
   | { type: "rejectCancel"; id: number }
+  | { type: "bulkReject"; ids: number[] }
   | null;
 
 export function PendingApprovalsPage() {
   const queryClient = useQueryClient();
   const [modal, setModal] = useState<ModalState>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const { data: requests = [], isLoading, isError } = useQuery<PendingRequest[]>({
     queryKey: ["pendingApprovals"],
     queryFn: getPendingApprovals,
   });
+
+  // Clear selectedIds when requests change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [requests]);
 
   function showFeedback(msg: string) {
     setFeedback(msg);
@@ -133,6 +142,8 @@ export function PendingApprovalsPage() {
   const isMutating =
     rejectMutation.isPending || rejectCancelMutation.isPending;
 
+  const bulkApproveMutation = useMutation({
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Pending Approvals</h1>
@@ -159,6 +170,14 @@ export function PendingApprovalsPage() {
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === requests.length}
+                    onChange={toggleSelectAll}
+                    className="rounded border-gray-300"
+                  />
+                </th>
                 {[
                   "Employee",
                   "Leave Type",
@@ -182,9 +201,17 @@ export function PendingApprovalsPage() {
             <tbody className="divide-y divide-gray-100 bg-white">
               {requests.map((req) => (
                 <tr key={req.id}>
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(req.id)}
+                      onChange={() => toggleSelect(req.id)}
+                      className="rounded border-gray-300"
+                    />
+                  </td>
                   <td className="px-4 py-3 font-medium text-gray-900">
-                    {req.user.name}
-                    <div className="text-xs text-gray-400">{req.user.email}</div>
+                    {req.employee.name}
+                    <div className="text-xs text-gray-400">{req.employee.email}</div>
                   </td>
                   <td className="px-4 py-3 text-gray-700">{req.leaveType.name}</td>
                   <td className="px-4 py-3 text-gray-600">{formatDate(req.startDate)}</td>
@@ -258,16 +285,46 @@ export function PendingApprovalsPage() {
         </div>
       )}
 
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4 flex items-center justify-between">
+          <span className="text-sm text-gray-600 font-medium">{selectedIds.size} selected</span>
+          <div className="flex space-x-3">
+            <button
+              onClick={handleBulkApprove}
+              disabled={bulkApproveMutation.isPending}
+              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              {bulkApproveMutation.isPending ? "Approving…" : "Approve Selected"}
+            </button>
+            <button
+              onClick={() => setModal({ type: "bulkReject", ids: Array.from(selectedIds) })}
+              disabled={bulkRejectMutation.isPending}
+              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {bulkRejectMutation.isPending ? "Rejecting…" : "Reject Selected"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {modal && (
         <RejectModal
           title={
             modal.type === "reject"
               ? "Reject Leave Request"
-              : "Reject Cancellation Request"
+              : modal.type === "rejectCancel"
+              ? "Reject Cancellation Request"
+              : `Reject ${modal.ids.length} Request(s)`
           }
-          onConfirm={handleRejectConfirm}
+          onConfirm={(comment: string) => {
+            if (modal.type === "bulkReject") {
+              handleBulkRejectConfirm(comment);
+            } else {
+              handleRejectConfirm(comment);
+            }
+          }}
           onCancel={() => setModal(null)}
-          isLoading={isMutating}
+          isLoading={isMutating || bulkRejectMutation.isPending}
         />
       )}
     </div>

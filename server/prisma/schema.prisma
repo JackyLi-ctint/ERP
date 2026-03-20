@@ -125,6 +125,7 @@ model LeaveRequest {
   status         LeaveStatus @default(PENDING)
   approvedById   String?
   approverComment String?
+  cancellationReason String?
   employee       User        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   leaveType      LeaveType   @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
   approvedBy     User?       @relation("LeaveApprover", fields: [approvedById], references: [id])

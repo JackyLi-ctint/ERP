@@ -18,10 +18,12 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isInitializing: boolean;
+  sessionExpired: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => void;
   refreshAuth: (refreshToken: string) => Promise<void>;
+  clearSessionExpired: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,6 +37,7 @@ export interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const logout = useCallback(() => {
     setUser(null);
@@ -68,10 +71,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Listen for auth:expired event dispatched by the 401 interceptor
   useEffect(() => {
-    const handleExpired = () => logout();
+    const handleExpired = () => setSessionExpired(true);
     window.addEventListener("auth:expired", handleExpired);
     return () => window.removeEventListener("auth:expired", handleExpired);
-  }, [logout]);
+  }, []);
 
   const login = useCallback(async (credentials: LoginRequest) => {
     const response: AuthResponse = await authApi.login(credentials);
@@ -101,10 +104,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [logout]);
 
+  const clearSessionExpired = useCallback(() => {
+    setSessionExpired(false);
+  }, []);
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
     isInitializing,
+    sessionExpired,
+    clearSessionExpired,
     login,
     register,
     logout,

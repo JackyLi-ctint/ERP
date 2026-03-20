@@ -1,4 +1,9 @@
+import dotenv from "dotenv";
 import { createApp } from "./app";
+
+// Prefer repo-root .env (../.env from server/), fallback to local server/.env
+dotenv.config({ path: "../.env" });
+dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 

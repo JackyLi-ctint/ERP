@@ -89,6 +89,31 @@ export function LoginPage() {
               {isLoading ? "Signing in..." : "Sign in"}
             </button>
           </div>
+
+          {/* Microsoft SSO Divider and Button */}
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-gray-50 text-gray-500">or</span>
+              </div>
+            </div>
+
+            <a
+              href="/api/auth/azure/initiate"
+              className="mt-4 flex w-full items-center justify-center gap-3 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+            >
+              {/* Note: This CDN image should be replaced with a bundled SVG/PNG in production */}
+              <img 
+                src="https://learn.microsoft.com/en-us/azure/active-directory/develop/media/howto-add-branding-in-apps/ms-symbollockup_mssymbol_19.svg" 
+                alt="Microsoft" 
+                className="h-5 w-5" 
+              />
+              Sign in with Microsoft
+            </a>
+          </div>
         </form>
       </div>
     </div>

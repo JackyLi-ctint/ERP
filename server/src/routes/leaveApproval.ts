@@ -9,6 +9,8 @@ import {
   rejectLeaveRequest,
   approveCancellation,
   rejectCancellation,
+  bulkApproveLeaveRequests,
+  bulkRejectLeaveRequests,
 } from "../services/leaveApproval.service";
 import { asyncHandler } from "../lib/asyncHandler";
 
@@ -18,6 +20,102 @@ const leaveApprovalRouter = Router();
 const commentSchema = z.object({
   comment: z.string().max(1000).optional(),
 });
+
+const bulkApproveSchema = z.object({
+  ids: z.array(z.number().positive()).min(1, "ids must be a non-empty array"),
+  comment: z.string().max(1000).optional(),
+});
+
+const bulkRejectSchema = z.object({
+  ids: z.array(z.number().positive()).min(1, "ids must be a non-empty array"),
+  comment: z.string().min(1, "comment is required").max(1000),
+});
+
+/**
+ * POST /api/leave-requests/bulk-approve
+ * Bulk approve multiple leave requests
+ * Accessible by: MANAGER, HR_ADMIN
+ * Returns: 200 with { leaveRequests: [...] }
+ */
+leaveApprovalRouter.post(
+  "/bulk-approve",
+  requireAuth,
+  requireRole("MANAGER", "HR_ADMIN"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const validation = bulkApproveSchema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({ message: "Validation error" });
+      return;
+    }
+
+    const { ids, comment } = validation.data;
+    const actorId = req.user?.id as string;
+    const actorRole = req.user?.role as Role;
+
+    try {
+      const approved = await bulkApproveLeaveRequests(
+        ids,
+        actorId,
+        actorRole,
+        comment,
+        prisma
+      );
+
+      res.status(200).json({ leaveRequests: approved });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Forbidden")) {
+        res.status(403).json({ message: error.message });
+      } else if (error instanceof Error && error.message.includes("No request IDs provided")) {
+        res.status(400).json({ message: error.message });
+      } else {
+        throw error;
+      }
+    }
+  })
+);
+
+/**
+ * POST /api/leave-requests/bulk-reject
+ * Bulk reject multiple leave requests
+ * Accessible by: MANAGER, HR_ADMIN
+ * Returns: 200 with { leaveRequests: [...] }
+ */
+leaveApprovalRouter.post(
+  "/bulk-reject",
+  requireAuth,
+  requireRole("MANAGER", "HR_ADMIN"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const validation = bulkRejectSchema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({ message: "Validation error" });
+      return;
+    }
+
+    const { ids, comment } = validation.data;
+    const actorId = req.user?.id as string;
+    const actorRole = req.user?.role as Role;
+
+    try {
+      const rejected = await bulkRejectLeaveRequests(
+        ids,
+        comment,
+        actorId,
+        actorRole,
+        prisma
+      );
+
+      res.status(200).json({ leaveRequests: rejected });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Forbidden")) {
+        res.status(403).json({ message: error.message });
+      } else if (error instanceof Error && (error.message.includes("No request IDs provided") || error.message.includes("Comment is required"))) {
+        res.status(400).json({ message: error.message });
+      } else {
+        throw error;
+      }
+    }
+  })
+);
 
 /**
  * POST /api/leave-requests/:id/approve

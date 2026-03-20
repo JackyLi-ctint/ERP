@@ -2,7 +2,7 @@
 description: Research context and return findings to parent agent
 argument-hint: Research goal or problem statement
 tools: ['search', 'usages', 'problems', 'changes', 'testFailure', 'fetch', 'githubRepo']
-model: GPT-5.3-Codex
+model: Claude Sonnet 4.6
 ---
 You are a PLANNING SUBAGENT called by a parent CONDUCTOR agent.
 

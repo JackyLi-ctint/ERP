@@ -4,8 +4,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
-import apiClient from "../../lib/api";
-import { getLeaveBalances } from "../../lib/api";
+import apiClient, { cancelLeaveRequest, getLeaveBalances } from "../../lib/api";
 import { LeaveDurationPreview } from "../../components/LeaveDurationPreview";
 
 interface LeaveType {
@@ -26,6 +25,7 @@ interface LeaveRequest {
   halfDay: boolean;
   period?: string;
   reason?: string;
+  cancellationReason?: string;
   status: string;
   leaveType: {
     id: number;
@@ -49,6 +49,12 @@ type SubmitLeaveFormData = z.infer<typeof submitLeaveSchema>;
 export function ApplyLeavePage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [cancelModalId, setCancelModalId] = useState<number | null>(null);
+  const [cancelModalStatus, setCancelModalStatus] = useState<string>("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [filterYear, setFilterYear] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterLeaveTypeId, setFilterLeaveTypeId] = useState("");
   const queryClient = useQueryClient();
   const today = new Date().toISOString().split("T")[0];
 
@@ -103,6 +109,23 @@ export function ApplyLeavePage() {
 
   const requests = (requestsData?.leaveRequests || []) as LeaveRequest[];
 
+  // Generate year options (current year ± 2 years)
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+
+  // Apply filters
+  const filteredRequests = useMemo(() => {
+    return requests.filter((req) => {
+      if (filterYear) {
+        const reqYear = new Date(req.startDate).getFullYear();
+        if (reqYear !== parseInt(filterYear)) return false;
+      }
+      if (filterStatus && req.status !== filterStatus) return false;
+      if (filterLeaveTypeId && req.leaveTypeId !== parseInt(filterLeaveTypeId)) return false;
+      return true;
+    });
+  }, [requests, filterYear, filterStatus, filterLeaveTypeId]);
+
   // Submit leave request mutation
   const submitMutation = useMutation({
     mutationFn: async (data: SubmitLeaveFormData) => {
@@ -146,11 +169,13 @@ export function ApplyLeavePage() {
 
   // Cancel leave request mutation
   const cancelMutation = useMutation({
-    mutationFn: async (requestId: number) => {
-      const response = await apiClient.delete(`/leave-requests/${requestId}`);
-      return response.data;
+    mutationFn: async ({ id, reason }: { id: number; reason?: string }) => {
+      await cancelLeaveRequest(id, reason);
     },
     onSuccess: () => {
+      setCancelModalId(null);
+      setCancelModalStatus("");
+      setCancelReason("");
       queryClient.invalidateQueries({ queryKey: ["myLeaveRequests"] });
     },
     onError: (error: any) => {
@@ -371,12 +396,57 @@ export function ApplyLeavePage() {
             </div>
           </div>
 
-          {/* Recent Requests Section */}
+          {/* Requests Section with Filters */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Your Requests
               </h2>
+
+              {/* Filter Bar */}
+              <div className="space-y-3 mb-4 pb-4 border-b border-gray-200">
+                {/* Year Filter */}
+                <select
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Years</option>
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Status Filter */}
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="CANCELLED">Cancelled</option>
+                  <option value="CANCEL_REQUESTED">Cancel Requested</option>
+                </select>
+
+                {/* Leave Type Filter */}
+                <select
+                  value={filterLeaveTypeId}
+                  onChange={(e) => setFilterLeaveTypeId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Leave Types</option>
+                  {leaveTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {isLoadingRequests ? (
                 <div className="space-y-3">
@@ -384,11 +454,11 @@ export function ApplyLeavePage() {
                     <div key={i} className="h-20 bg-gray-100 rounded animate-pulse" />
                   ))}
                 </div>
-              ) : requests.length === 0 ? (
-                <p className="text-gray-500 text-sm">No leave requests yet.</p>
+              ) : filteredRequests.length === 0 ? (
+                <p className="text-gray-500 text-sm">No leave requests match the filters.</p>
               ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {requests.slice(0, 10).map((req) => (
+                  {filteredRequests.slice(0, 10).map((req) => (
                     <div
                       key={req.id}
                       className="p-3 border border-gray-200 rounded-lg text-sm"
@@ -409,6 +479,8 @@ export function ApplyLeavePage() {
                               ? "bg-green-100 text-green-800"
                               : req.status === "REJECTED"
                               ? "bg-red-100 text-red-800"
+                              : req.status === "CANCEL_REQUESTED"
+                              ? "bg-orange-100 text-orange-800"
                               : "bg-gray-100 text-gray-800"
                           }`}
                         >
@@ -421,9 +493,9 @@ export function ApplyLeavePage() {
                           >
                             Slip
                           </Link>
-                          {req.status === "PENDING" && (
+                          {(req.status === "PENDING" || req.status === "APPROVED") && (
                             <button
-                              onClick={() => cancelMutation.mutate(req.id)}
+                              onClick={() => { setCancelModalId(req.id); setCancelModalStatus(req.status); }}
                               disabled={cancelMutation.isPending}
                               className="text-xs text-red-600 hover:text-red-700 disabled:text-gray-400"
                             >
@@ -440,6 +512,59 @@ export function ApplyLeavePage() {
           </div>
         </div>
       </div>
+
+      {/* Cancel Modal */}
+      {cancelModalId !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Cancel Leave Request
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {cancelModalStatus === "APPROVED"
+                ? "This leave has been approved. Submitting will put it in a pending-cancellation state requiring manager approval."
+                : "Are you sure you want to cancel this leave request?"}{" "}Please provide a reason (optional).
+            </p>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value.slice(0, 500))}
+              maxLength={500}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent mb-2"
+              placeholder="Cancel reason (max 500 characters)..."
+            />
+            <p className="text-xs text-gray-500 mb-4">
+              {cancelReason.length}/500 characters
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setCancelModalId(null);
+                  setCancelModalStatus("");
+                  setCancelReason("");
+                }}
+                className="flex-1 px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Don't Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (cancelModalId !== null) {
+                    cancelMutation.mutate({
+                      id: cancelModalId,
+                      reason: cancelReason || undefined,
+                    });
+                  }
+                }}
+                disabled={cancelMutation.isPending}
+                className="flex-1 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400"
+              >
+                {cancelMutation.isPending ? "Cancelling..." : "Confirm Cancel"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

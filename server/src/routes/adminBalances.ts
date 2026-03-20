@@ -198,3 +198,69 @@ adminBalancesRouter.post(
     res.status(200).json({ carried, skipped });
   })
 );
+
+/**
+ * PATCH /api/admin/balances/:id
+ * Adjust the totalDays for a specific leave balance record.
+ * HR_ADMIN only.
+ */
+adminBalancesRouter.patch(
+  "/:id",
+  requireAuth,
+  requireRole("HR_ADMIN"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id as string, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ message: "Invalid balance id" });
+      return;
+    }
+
+    const { totalDays } = req.body as { totalDays?: unknown };
+    const totalNum = Number(totalDays);
+    if (totalDays === undefined || !Number.isInteger(totalNum) || totalNum < 0 || totalNum > 365) {
+      res.status(400).json({ message: "totalDays must be an integer between 0 and 365" });
+      return;
+    }
+
+    const existing = await prisma.leaveBalance.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ message: "Balance not found" });
+      return;
+    }
+
+    const updated = await prisma.leaveBalance.update({
+      where: { id },
+      data: { totalDays: totalNum },
+      include: {
+        user: { select: { name: true, email: true } },
+        leaveType: { select: { name: true } },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: "ADJUST_BALANCE",
+        entityType: "LeaveBalance",
+        entityId: String(id),
+        before: { totalDays: existing.totalDays },
+        after: { totalDays: totalNum },
+      },
+    });
+
+    res.status(200).json({
+      balance: {
+        id: updated.id,
+        userId: updated.userId,
+        userName: updated.user.name,
+        userEmail: updated.user.email,
+        leaveTypeId: updated.leaveTypeId,
+        leaveTypeName: updated.leaveType.name,
+        year: updated.year,
+        totalDays: updated.totalDays,
+        usedDays: updated.usedDays,
+        pendingDays: updated.pendingDays,
+      },
+    });
+  })
+);

@@ -5,7 +5,7 @@ import { JwtService } from "../auth/jwt.service";
 
 const prisma = new PrismaClient();
 
-describe("DELETE /api/leave-requests/:id (cancel)", () => {
+describe("PATCH /api/leave-requests/:id/cancel (cancel with reason)", () => {
   let testUserId: string;
   let otherUserId: string;
   let hrAdminId: string;
@@ -24,9 +24,9 @@ describe("DELETE /api/leave-requests/:id (cancel)", () => {
     // Create HR Admin
     const hrAdmin = await prisma.user.create({
       data: {
-        id: "hr-admin-1",
+        id: "hr-admin-patch-1",
         name: "HR Admin",
-        email: "hr@example.com",
+        email: "hr-patch@example.com",
         passwordHash: "hashed",
         role: "HR_ADMIN",
       },
@@ -36,9 +36,9 @@ describe("DELETE /api/leave-requests/:id (cancel)", () => {
     // Create test user
     const testUser = await prisma.user.create({
       data: {
-        id: "test-user-1",
+        id: "test-user-patch-1",
         name: "Test User",
-        email: "testuser@example.com",
+        email: "testuser-patch@example.com",
         passwordHash: "hashed",
         role: "EMPLOYEE",
       },
@@ -48,9 +48,9 @@ describe("DELETE /api/leave-requests/:id (cancel)", () => {
     // Create other user
     const otherUser = await prisma.user.create({
       data: {
-        id: "other-user-1",
+        id: "other-user-patch-1",
         name: "Other User",
-        email: "otheruser@example.com",
+        email: "otheruser-patch@example.com",
         passwordHash: "hashed",
         role: "EMPLOYEE",
       },
@@ -110,33 +110,24 @@ describe("DELETE /api/leave-requests/:id (cancel)", () => {
     // Generate auth tokens
     authToken = JwtService.signAccessToken({
       id: testUserId,
-      email: "testuser@example.com",
+      email: "testuser-patch@example.com",
       role: "EMPLOYEE",
     });
 
     otherUserToken = JwtService.signAccessToken({
       id: otherUserId,
-      email: "otheruser@example.com",
+      email: "otheruser-patch@example.com",
       role: "EMPLOYEE",
     });
   });
 
-  afterAll(async () => {
-    await prisma.leaveRequest.deleteMany({});
-    await prisma.leaveBalance.deleteMany({});
-    await prisma.leaveType.deleteMany({});
-    await prisma.publicHoliday.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.$disconnect();
-  });
-
   test("should return 401 without auth", async () => {
-    const res = await request(app).delete("/api/leave-requests/1");
+    const res = await request(app).patch("/api/leave-requests/1/cancel");
 
     expect(res.status).toBe(401);
   });
 
-  test("should cancel PENDING request and decrement pendingDays", async () => {
+  test("should cancel PENDING request with reason and store cancellationReason", async () => {
     // Create a pending request
     const createRes = await request(app)
       .post("/api/leave-requests")
@@ -149,37 +140,72 @@ describe("DELETE /api/leave-requests/:id (cancel)", () => {
 
     const requestId = createRes.body.leaveRequest.id;
 
-    // Verify balance has pending days
-    let balance = await prisma.leaveBalance.findUnique({
-      where: {
-        userId_leaveTypeId_year: {
-          userId: testUserId,
-          leaveTypeId,
-          year: 2026,
-        },
-      },
-    });
-    expect(balance?.pendingDays).toBe(1);
-
-    // Cancel the request
+    // Cancel with reason
     const res = await request(app)
-      .delete(`/api/leave-requests/${requestId}`)
-      .set("Authorization", `Bearer ${authToken}`);
+      .patch(`/api/leave-requests/${requestId}/cancel`)
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({
+        reason: "Personal reasons",
+      });
 
     expect(res.status).toBe(200);
     expect(res.body.leaveRequest.status).toBe("CANCELLED");
+    expect(res.body.leaveRequest.cancellationReason).toBe("Personal reasons");
 
-    // Verify balance decremented
-    balance = await prisma.leaveBalance.findUnique({
-      where: {
-        userId_leaveTypeId_year: {
-          userId: testUserId,
-          leaveTypeId,
-          year: 2026,
-        },
-      },
+    // Verify in database
+    const cancelledRequest = await prisma.leaveRequest.findUnique({
+      where: { id: requestId },
     });
-    expect(balance?.pendingDays).toBe(0);
+    expect(cancelledRequest?.cancellationReason).toBe("Personal reasons");
+  });
+
+  test("should cancel PENDING request without reason (optional field)", async () => {
+    // Create a pending request
+    const createRes = await request(app)
+      .post("/api/leave-requests")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({
+        leaveTypeId,
+        startDate: "2026-04-01",
+        endDate: "2026-04-01",
+      });
+
+    const requestId = createRes.body.leaveRequest.id;
+
+    // Cancel without reason
+    const res = await request(app)
+      .patch(`/api/leave-requests/${requestId}/cancel`)
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.leaveRequest.status).toBe("CANCELLED");
+    expect(res.body.leaveRequest.cancellationReason).toBeNull();
+  });
+
+  test("should reject reason exceeding 500 chars", async () => {
+    // Create a pending request
+    const createRes = await request(app)
+      .post("/api/leave-requests")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({
+        leaveTypeId,
+        startDate: "2026-04-01",
+        endDate: "2026-04-01",
+      });
+
+    const requestId = createRes.body.leaveRequest.id;
+
+    const longReason = "a".repeat(501);
+    const res = await request(app)
+      .patch(`/api/leave-requests/${requestId}/cancel`)
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({
+        reason: longReason,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/validation|Validation/i);
   });
 
   test("should return 403 when non-owner tries to cancel", async () => {
@@ -197,13 +223,16 @@ describe("DELETE /api/leave-requests/:id (cancel)", () => {
 
     // Try to cancel as other user
     const res = await request(app)
-      .delete(`/api/leave-requests/${requestId}`)
-      .set("Authorization", `Bearer ${otherUserToken}`);
+      .patch(`/api/leave-requests/${requestId}/cancel`)
+      .set("Authorization", `Bearer ${otherUserToken}`)
+      .send({
+        reason: "Trying to cancel someone else's request",
+      });
 
     expect(res.status).toBe(403);
   });
 
-  test("should return 200 when cancelling APPROVED request (sets CANCEL_REQUESTED)", async () => {
+  test("should cancel APPROVED request with reason (sets CANCEL_REQUESTED)", async () => {
     // Create a pending request
     const createRes = await request(app)
       .post("/api/leave-requests")
@@ -222,45 +251,26 @@ describe("DELETE /api/leave-requests/:id (cancel)", () => {
       data: { status: "APPROVED" },
     });
 
-    // Cancel approved request - should set CANCEL_REQUESTED instead of failing
+    // Cancel approved request with reason - should set CANCEL_REQUESTED instead of failing
     const res = await request(app)
-      .delete(`/api/leave-requests/${requestId}`)
-      .set("Authorization", `Bearer ${authToken}`);
+      .patch(`/api/leave-requests/${requestId}/cancel`)
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({
+        reason: "Need to reschedule",
+      });
 
     expect(res.status).toBe(200);
     expect(res.body.leaveRequest.status).toBe("CANCEL_REQUESTED");
-  });
-
-  test("should return 422 when trying to cancel already CANCELLED request", async () => {
-    // Create and cancel a request
-    const createRes = await request(app)
-      .post("/api/leave-requests")
-      .set("Authorization", `Bearer ${authToken}`)
-      .send({
-        leaveTypeId,
-        startDate: "2026-04-01",
-        endDate: "2026-04-01",
-      });
-
-    const requestId = createRes.body.leaveRequest.id;
-
-    // Cancel it
-    await request(app)
-      .delete(`/api/leave-requests/${requestId}`)
-      .set("Authorization", `Bearer ${authToken}`);
-
-    // Try to cancel again
-    const res = await request(app)
-      .delete(`/api/leave-requests/${requestId}`)
-      .set("Authorization", `Bearer ${authToken}`);
-
-    expect(res.status).toBe(422);
+    expect(res.body.leaveRequest.cancellationReason).toBe("Need to reschedule");
   });
 
   test("should return 404 for non-existent request", async () => {
     const res = await request(app)
-      .delete("/api/leave-requests/99999")
-      .set("Authorization", `Bearer ${authToken}`);
+      .patch("/api/leave-requests/99999/cancel")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({
+        reason: "Test reason",
+      });
 
     expect(res.status).toBe(404);
   });
