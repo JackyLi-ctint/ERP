@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "./AppError";
+import logger from "./logger";
 
 /**
  * Wraps an async route handler and forwards AppError instances to the global
@@ -13,7 +14,7 @@ export const asyncHandler =
         next(error);
         return;
       }
-      console.error("Unhandled route error:", error);
+      logger.error({ err: error }, "Unhandled route error");
       res.status(500).json({ message: "An unexpected error occurred." });
     });
   };

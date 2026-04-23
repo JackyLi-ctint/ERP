@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import logger from "../lib/logger";
 
 // lazily created transporter - only created once env vars are verified
 let _transporter: nodemailer.Transporter | null = null;
@@ -47,7 +48,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
     });
   } catch (error) {
     // Log error but never throw - email failure should not break main flow
-    console.error("[Email] Failed to send email:", error);
+    logger.error({ err: error }, "[Email] Failed to send email");
   }
 }
 

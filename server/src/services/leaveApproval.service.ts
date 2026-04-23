@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma, Role, LeaveStatus, LeaveRequest, User } from "@prisma/client";
 import { sendLeaveApprovedEmail, sendLeaveRejectedEmail } from "./email.service";
 import { AppError } from "../lib/AppError";
+import logger from "../lib/logger";
 
 type TxClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -125,7 +126,7 @@ export async function approveLeaveRequest(
     );
   } catch (error) {
     // Log but don't throw - email failure shouldn't break the approval
-    console.error("[Leave Approval] Failed to send approval email:", error);
+    logger.warn({ err: error }, "[Leave Approval] Failed to send approval email");
   }
 
   return result;
@@ -227,7 +228,7 @@ export async function rejectLeaveRequest(
     );
   } catch (error) {
     // Log but don't throw - email failure shouldn't break the rejection
-    console.error("[Leave Approval] Failed to send rejection email:", error);
+    logger.warn({ err: error }, "[Leave Approval] Failed to send rejection email");
   }
 
   return result;

@@ -1,10 +1,12 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import pinoHttp from "pino-http";
 import rateLimit from "express-rate-limit";
 import routes from "./routes";
 import config from "./config";
 import { AppError } from "./lib/AppError";
+import logger from "./lib/logger";
 
 export function createApp() {
   const app = express();
@@ -19,6 +21,9 @@ export function createApp() {
       credentials: true,
     })
   );
+
+  // HTTP request logging
+  app.use(pinoHttp({ logger }));
 
   // Body parsing middleware
   app.use(express.json({ limit: config.bodyLimit }));
@@ -60,7 +65,11 @@ export function createApp() {
   // Global JSON error handler — must be last; catches errors forwarded via next(err)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    console.error(err);
+    if (err instanceof AppError && err.statusCode < 500) {
+      logger.warn({ err }, err.message);
+    } else {
+      logger.error({ err }, err.message);
+    }
     if (err instanceof AppError) {
       res.status(err.statusCode).json({ message: err.message });
     } else {

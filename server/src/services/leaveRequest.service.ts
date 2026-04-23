@@ -2,6 +2,7 @@ import { PrismaClient, LeaveRequest, Role } from "@prisma/client";
 import { countWorkingDays, getHolidaySet } from "./workingDays.service";
 import { sendNewLeaveRequestEmail } from "./email.service";
 import { AppError } from "../lib/AppError";
+import logger from "../lib/logger";
 
 /**
  * Submit a new leave request
@@ -223,7 +224,7 @@ export async function submitLeaveRequest(
     }
   } catch (error) {
     // Log but don't throw - email failure shouldn't break the request submission
-    console.error("[Leave Request] Failed to send new leave request notification:", error);
+    logger.warn({ err: error }, "[Leave Request] Failed to send new leave request notification");
   }
 
   return result;

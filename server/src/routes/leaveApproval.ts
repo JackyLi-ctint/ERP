@@ -52,25 +52,15 @@ leaveApprovalRouter.post(
     const actorId = req.user?.id as string;
     const actorRole = req.user?.role as Role;
 
-    try {
-      const approved = await bulkApproveLeaveRequests(
-        ids,
-        actorId,
-        actorRole,
-        comment,
-        prisma
-      );
+    const approved = await bulkApproveLeaveRequests(
+      ids,
+      actorId,
+      actorRole,
+      comment,
+      prisma
+    );
 
-      res.status(200).json({ leaveRequests: approved });
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Forbidden")) {
-        res.status(403).json({ message: error.message });
-      } else if (error instanceof Error && error.message.includes("No request IDs provided")) {
-        res.status(400).json({ message: error.message });
-      } else {
-        throw error;
-      }
-    }
+    res.status(200).json({ leaveRequests: approved });
   })
 );
 
@@ -95,25 +85,15 @@ leaveApprovalRouter.post(
     const actorId = req.user?.id as string;
     const actorRole = req.user?.role as Role;
 
-    try {
-      const rejected = await bulkRejectLeaveRequests(
-        ids,
-        comment,
-        actorId,
-        actorRole,
-        prisma
-      );
+    const rejected = await bulkRejectLeaveRequests(
+      ids,
+      comment,
+      actorId,
+      actorRole,
+      prisma
+    );
 
-      res.status(200).json({ leaveRequests: rejected });
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Forbidden")) {
-        res.status(403).json({ message: error.message });
-      } else if (error instanceof Error && (error.message.includes("No request IDs provided") || error.message.includes("Comment is required"))) {
-        res.status(400).json({ message: error.message });
-      } else {
-        throw error;
-      }
-    }
+    res.status(200).json({ leaveRequests: rejected });
   })
 );
 
