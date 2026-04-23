@@ -1,0 +1,7 @@
+Plan: leave-management-plan.md — Phase 5: Approver Workflow + Teams (backend)
+Related: leave-management-complete.md — Phase 5
+
+POST approve/reject/approve-cancellation/reject-cancellation routes,
+GET /manager/leave-requests (team-scoped), GET /users + PATCH identity
+(HR_ADMIN), asyncHandler extracted to shared lib.
+27 new tests; 153/153 total passing.
