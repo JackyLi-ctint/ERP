@@ -44,32 +44,49 @@ const identitySchema = z
     message: "At least one of team or title must be provided",
   });
 
+const paginationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).default(config.pagination.defaultSize),
+});
+
 /**
  * GET /api/users
- * Get all users
+ * Get all users with optional offset pagination
  * Accessible by: HR_ADMIN only
- * Returns: 200 with { users }
+ * Query params: page (default 1), pageSize (default from config, max from config)
+ * Returns: 200 with { users, total, page, pageSize }
  */
 usersRouter.get(
   "/",
   requireAuth,
   requireRole("HR_ADMIN"),
-  asyncHandler(async (_req: Request, res: Response) => {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        team: true,
-        title: true,
-      },
-      orderBy: {
-        name: "asc",
-      },
-    });
+  asyncHandler(async (req: Request, res: Response) => {
+    const parsed = paginationQuerySchema.safeParse(req.query);
+    const page = parsed.success ? parsed.data.page : 1;
+    const pageSize = parsed.success
+      ? Math.min(parsed.data.pageSize, config.pagination.maxSize)
+      : config.pagination.defaultSize;
 
-    res.status(200).json({ users });
+    const skip = (page - 1) * pageSize;
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          team: true,
+          title: true,
+        },
+        orderBy: { name: "asc" },
+        skip,
+        take: pageSize,
+      }),
+      prisma.user.count(),
+    ]);
+
+    res.status(200).json({ users, total, page, pageSize });
   })
 );
 

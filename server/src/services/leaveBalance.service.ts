@@ -10,54 +10,34 @@ export async function initBalances(
   year: number,
   prisma: PrismaClient
 ): Promise<{ created: number; skipped: number }> {
-  // Get all active users
-  const activeUsers = await prisma.user.findMany({
-    where: {
-      // If user model ever adds isActive field in future, we'd filter here
-      // For now, we include all users
-    },
+  // Fetch active users and active leave types in parallel
+  const [activeUsers, activeLeaveTypes] = await Promise.all([
+    prisma.user.findMany(),
+    prisma.leaveType.findMany({ where: { isActive: true } }),
+  ]);
+
+  const total = activeUsers.length * activeLeaveTypes.length;
+  if (total === 0) return { created: 0, skipped: 0 };
+
+  // Build batch data for all user × leaveType combinations
+  const data = activeUsers.flatMap((user) =>
+    activeLeaveTypes.map((leaveType) => ({
+      userId: user.id,
+      leaveTypeId: leaveType.id,
+      year,
+      totalDays: leaveType.defaultDays,
+      usedDays: 0,
+      pendingDays: 0,
+    }))
+  );
+
+  // Single batched insert — skips any combination that already exists
+  const result = await prisma.leaveBalance.createMany({
+    data,
+    skipDuplicates: true,
   });
 
-  // Get all active leave types
-  const activeLeaveTypes = await prisma.leaveType.findMany({
-    where: { isActive: true },
-  });
-
-  let created = 0;
-  let skipped = 0;
-
-  // Create or skip balances for each user × leave type combination
-  for (const user of activeUsers) {
-    for (const leaveType of activeLeaveTypes) {
-      const existingBalance = await prisma.leaveBalance.findUnique({
-        where: {
-          userId_leaveTypeId_year: {
-            userId: user.id,
-            leaveTypeId: leaveType.id,
-            year,
-          },
-        },
-      });
-
-      if (existingBalance) {
-        skipped++;
-      } else {
-        await prisma.leaveBalance.create({
-          data: {
-            userId: user.id,
-            leaveTypeId: leaveType.id,
-            year,
-            totalDays: leaveType.defaultDays,
-            usedDays: 0,
-            pendingDays: 0,
-          },
-        });
-        created++;
-      }
-    }
-  }
-
-  return { created, skipped };
+  return { created: result.count, skipped: total - result.count };
 }
 
 /**

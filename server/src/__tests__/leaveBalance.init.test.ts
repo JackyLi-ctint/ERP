@@ -159,6 +159,46 @@ describe("initBalances", () => {
     expect(allBalances.length).toBe(2);
   });
 
+  test("should use a single batched createMany rather than N individual inserts", async () => {
+    // Create 2 leave types (2 users: hrAdmin + user-1) → 4 total combos
+    await prisma.leaveType.create({
+      data: {
+        name: "Annual Leave",
+        defaultDays: 20,
+        isCarryForward: false,
+        requiresDocument: false,
+        isActive: true,
+        createdById: hrAdminId,
+      },
+    });
+    await prisma.leaveType.create({
+      data: {
+        name: "Sick Leave",
+        defaultDays: 10,
+        isCarryForward: false,
+        requiresDocument: true,
+        isActive: true,
+        createdById: hrAdminId,
+      },
+    });
+    await prisma.user.create({
+      data: {
+        id: "user-1",
+        name: "User 1",
+        email: "user1@example.com",
+        passwordHash: "hashed",
+        role: "EMPLOYEE",
+      },
+    });
+
+    const createManySpy = jest.spyOn(prisma.leaveBalance, "createMany");
+    await initBalances(2025, prisma);
+
+    // One batch call regardless of how many user × leaveType combos exist
+    expect(createManySpy).toHaveBeenCalledTimes(1);
+    createManySpy.mockRestore();
+  });
+
   test("should exclude inactive leave types from balance init", async () => {
     // Create active leave type
     await prisma.leaveType.create({

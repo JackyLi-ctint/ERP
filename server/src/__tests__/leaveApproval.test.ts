@@ -624,6 +624,54 @@ describe("LeaveApproval Service", () => {
 
       expect(result).toHaveLength(0);
     });
+
+    it("test 23: respects take option to limit results", async () => {
+      // Create another Team A employee with a pending request
+      const anotherEmployee = await prisma.user.create({
+        data: {
+          name: "Another Employee",
+          email: "another.emp@test.com",
+          passwordHash: "hashed",
+          role: "EMPLOYEE",
+          team: "Team A",
+        },
+      });
+      const anotherBalance = await prisma.leaveBalance.create({
+        data: {
+          userId: anotherEmployee.id,
+          leaveTypeId: leaveType.id,
+          year: 2026,
+          totalDays: 14,
+          usedDays: 0,
+          pendingDays: 1,
+        },
+      });
+      await prisma.leaveRequest.create({
+        data: {
+          employeeId: anotherEmployee.id,
+          leaveTypeId: leaveType.id,
+          startDate: new Date("2026-05-01"),
+          endDate: new Date("2026-05-01"),
+          halfDay: false,
+          totalDays: 1,
+          status: "PENDING",
+        },
+      });
+
+      try {
+        // Without pagination options, manager sees 2 requests
+        const allResults = await getSubordinatePendingRequests(manager.id, manager.role, prisma);
+        expect(allResults).toHaveLength(2);
+
+        // With take=1, should only return 1 result
+        const pagedResults = await getSubordinatePendingRequests(manager.id, manager.role, prisma, { skip: 0, take: 1 });
+        expect(pagedResults).toHaveLength(1);
+      } finally {
+        await prisma.leaveRequest.deleteMany({ where: { employeeId: anotherEmployee.id } });
+        await prisma.leaveBalance.delete({ where: { id: anotherBalance.id } });
+        await prisma.user.delete({ where: { id: anotherEmployee.id } });
+      }
+    });
   });
 });
 

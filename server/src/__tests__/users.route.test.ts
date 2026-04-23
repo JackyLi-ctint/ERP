@@ -144,6 +144,40 @@ describe("users routes", () => {
         expect(user).not.toHaveProperty("passwordHash");
       });
     });
+
+    test("should return paginated first page with total when pageSize specified", async () => {
+      const res = await request(app)
+        .get("/api/users?pageSize=2")
+        .set("Authorization", `Bearer ${hrAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.users)).toBe(true);
+      expect(res.body.users).toHaveLength(2);
+      expect(res.body.total).toBe(4);
+      expect(res.body.page).toBe(1);
+      expect(res.body.pageSize).toBe(2);
+    });
+
+    test("should return second page of users", async () => {
+      const res = await request(app)
+        .get("/api/users?page=2&pageSize=2")
+        .set("Authorization", `Bearer ${hrAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.users).toHaveLength(2);
+      expect(res.body.total).toBe(4);
+      expect(res.body.page).toBe(2);
+      expect(res.body.pageSize).toBe(2);
+    });
+
+    test("should cap pageSize at config pagination max", async () => {
+      const res = await request(app)
+        .get("/api/users?pageSize=9999")
+        .set("Authorization", `Bearer ${hrAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.pageSize).toBeLessThanOrEqual(100);
+    });
   });
 
   describe("PATCH /api/users/:id/identity", () => {

@@ -1,12 +1,19 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { getSubordinatePendingRequests } from "../services/leaveApproval.service";
 import { asyncHandler } from "../lib/asyncHandler";
+import config from "../config";
 
 const managerLeaveRequestsRouter = Router();
+
+const paginationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).default(config.pagination.defaultSize),
+});
 
 /**
  * GET /api/manager/leave-requests
@@ -14,7 +21,8 @@ const managerLeaveRequestsRouter = Router();
  * MANAGER sees only same-team requests
  * HR_ADMIN sees all requests
  * Accessible by: MANAGER, HR_ADMIN
- * Returns: 200 with { leaveRequests }
+ * Query params: page (default 1), pageSize (default from config, max from config)
+ * Returns: 200 with { leaveRequests, page, pageSize }
  */
 managerLeaveRequestsRouter.get(
   "/",
@@ -24,13 +32,20 @@ managerLeaveRequestsRouter.get(
     const actorId = req.user?.id as string;
     const actorRole = req.user?.role as Role;
 
-    const leaveRequests = await getSubordinatePendingRequests(
-      actorId,
-      actorRole,
-      prisma
-    );
+    const parsed = paginationQuerySchema.safeParse(req.query);
+    const page = parsed.success ? parsed.data.page : 1;
+    const pageSize = parsed.success
+      ? Math.min(parsed.data.pageSize, config.pagination.maxSize)
+      : config.pagination.defaultSize;
 
-    res.status(200).json({ leaveRequests });
+    const skip = (page - 1) * pageSize;
+
+    const leaveRequests = await getSubordinatePendingRequests(actorId, actorRole, prisma, {
+      skip,
+      take: pageSize,
+    });
+
+    res.status(200).json({ leaveRequests, page, pageSize });
   })
 );
 

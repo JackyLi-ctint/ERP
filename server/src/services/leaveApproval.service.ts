@@ -384,8 +384,12 @@ export async function rejectCancellation(
 export async function getSubordinatePendingRequests(
   actorId: string,
   actorRole: Role,
-  prisma: PrismaClient
+  prisma: PrismaClient,
+  options?: { skip?: number; take?: number }
 ): Promise<(LeaveRequest & { employee: User; leaveType: Prisma.LeaveTypeGetPayload<{}> })[]> {
+  const skip = options?.skip ?? 0;
+  const take = options?.take;
+
   // HR_ADMIN sees all PENDING + CANCEL_REQUESTED (excluding own requests)
   if (actorRole === Role.HR_ADMIN) {
     return prisma.leaveRequest.findMany({
@@ -400,6 +404,8 @@ export async function getSubordinatePendingRequests(
       orderBy: {
         createdAt: "asc",
       },
+      skip,
+      ...(take !== undefined && { take }),
     });
   }
 
@@ -429,6 +435,8 @@ export async function getSubordinatePendingRequests(
     orderBy: {
       createdAt: "asc",
     },
+    skip,
+    ...(take !== undefined && { take }),
   });
 }
 
