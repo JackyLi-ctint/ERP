@@ -1,8 +1,8 @@
-## Plan Complete: 7-Phase ERP Leave Management Improvements
+## Plan Complete: ERP Leave Management Improvements
 
-The full improvements plan has been implemented across 7 phases, adding robust infrastructure, new features (leave filters, bulk approval, email notifications, audit log, CSV import, Azure AD SSO), and an end-to-end test scaffold. All 251 server-side tests pass and 22 Playwright E2E tests are ready to run against the running dev server.
+The full improvements plan has been implemented across 8 phases, adding robust infrastructure, new features (leave filters, bulk approval, email notifications, audit log, CSV import, Azure AD SSO), an end-to-end test scaffold, and server observability/hardening. All 282 server-side tests pass and 22 Playwright E2E tests are ready to run against the running dev server.
 
-**Phases Completed:** 7 of 7
+**Phases Completed:** 8 of 8
 1. ✅ Phase 1: Infrastructure Wins (ErrorBoundary, SessionExpiredModal, postinstall)
 2. ✅ Phase 2: Leave History Filters + Cancellation Reason
 3. ✅ Phase 3: Bulk Approval
@@ -10,6 +10,7 @@ The full improvements plan has been implemented across 7 phases, adding robust i
 5. ✅ Phase 5: Audit Log Viewer
 6. ✅ Phase 6: CSV User Import + Azure Entra ID (OIDC) Scaffold
 7. ✅ Phase 7: Shared Types + Playwright E2E
+8. ✅ Phase 8: Structured Logging, Bulk-Route Hardening, Server Resilience
 
 **All Files Created/Modified:**
 - `server/package.json` — postinstall, nodemailer, csv-parse, multer, @azure/msal-node
@@ -44,6 +45,15 @@ The full improvements plan has been implemented across 7 phases, adding robust i
 - `e2e/helpers.ts` *(new)*, `e2e/auth.spec.ts` *(new)*, `e2e/leave-flow.spec.ts` *(new)*, `e2e/bulk-approval.spec.ts` *(new)*
 - `.env.example` — SMTP + Azure vars
 - `package.json` — packages/* workspace, test:e2e script
+- `server/src/lib/logger.ts` *(new)* — pino singleton; pino-pretty in dev, raw NDJSON in prod
+- `server/src/app.ts` — pino-http request-logging middleware, `console.error` → `logger`
+- `server/src/lib/asyncHandler.ts` — `console.error` → `logger.error`
+- `server/src/server.ts` — DATABASE_URL startup validation, console calls → logger, SIGTERM/SIGINT graceful shutdown
+- `server/src/services/email.service.ts` — `console.error` → `logger.error`
+- `server/src/services/leaveRequest.service.ts` — `console.error` → `logger.warn`
+- `server/src/services/leaveApproval.service.ts` — 2× `console.error` → `logger.warn`
+- `server/src/routes/leaveApproval.ts` — removed redundant try/catch from bulk-approve and bulk-reject
+- `server/src/__tests__/managerLeaveRequests.route.test.ts` *(new)* — 5 integration tests
 
 **Key Functions/Classes Added:**
 - `ErrorBoundary` (React class component)
@@ -56,10 +66,14 @@ The full improvements plan has been implemented across 7 phases, adding robust i
 - `getMsalClient()`, `isAzureConfigured()`, `generateState()`, `consumeState()`, `getAuthCodeUrl()`, `acquireTokenByCode()`
 - `loginAs()`, `logout()` (Playwright helpers)
 - 19 Zod schemas in `@erp/shared-types`
+- `logger` — pino singleton with conditional pino-pretty transport
+- `gracefulShutdown()` — SIGTERM/SIGINT handler with `prisma.$disconnect()`
+- `createApp` — gains `pinoHttp` middleware and structured error-handler logging
+- `leaveApprovalRouter` POST `/bulk-approve` and POST `/bulk-reject` — inline try/catch removed (AppError propagates naturally)
 
 **Test Coverage:**
-- Total tests written: 251 server (Jest) + 22 E2E (Playwright) = 273 tests
-- All server tests passing: ✅ (251/251 with --runInBand)
+- Total tests written: 282 server (Jest) + 22 E2E (Playwright) = 304 tests
+- All server tests passing: ✅ (282/282)
 - E2E tests: require `npm run dev` server to be running before `npm run test:e2e`
 
 **Recommendations for Next Steps:**
@@ -69,3 +83,4 @@ The full improvements plan has been implemented across 7 phases, adding robust i
 - Bundle Microsoft logo SVG locally (currently loaded from CDN in LoginPage)
 - Set actual Azure AD credentials in production `.env` to activate SSO
 - Configure SMTP in production `.env` to activate email notifications
+- Set `LOG_LEVEL=debug` in development `.env` for verbose pino output
