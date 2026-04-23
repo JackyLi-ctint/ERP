@@ -1,0 +1,6 @@
+Plan: leave-management-plan.md — Phase 6: Leave Slip + HR Records + Balance Admin
+Related: leave-management-complete.md — Phase 6
+
+LeaveSlipPage (print-friendly), HRRecordsPage (filterable + paginated),
+BalanceAdminPage (init/carry-forward), Dashboard balance cards.
+36 new tests; 202/202 total passing.
