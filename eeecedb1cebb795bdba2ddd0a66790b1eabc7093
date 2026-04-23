@@ -1,0 +1,6 @@
+Plan: improvements-plan.md — Phase 7: Shared Types + E2E (test hardening)
+Related: improvements-complete.md — Phase 7
+
+Fix test isolation regressions: FK cleanup order (leaveRequest/balance/
+leaveType before user), fake timers with fixed date 2026-03-18 for cancel
+and submit tests, unique constraint collision fixes across 3 test suites.
