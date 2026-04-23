@@ -1,0 +1,7 @@
+Plan: improvements-plan.md
+Phase: Post-Phase 5 performance fix (Audit Log Viewer)
+Related: improvements-complete.md — Phase 5 (Audit Log Viewer)
+
+Addresses N+1 query found during Phase 5 implementation review.
+Adds pagination to GET /users and GET /manager/leave-requests,
+referenced in improvements-complete.md under Phase 5 infrastructure.
