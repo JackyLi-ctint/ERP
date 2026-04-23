@@ -1,0 +1,7 @@
+Plan: leave-management-plan.md — Phase 7: Dashboard Polish + Hardening ✅ COMPLETE
+Related: leave-management-complete.md — Phase 7 (plan complete)
+
+asyncHandler hardening, PATCH /users/:id role update, Dashboard quick
+actions + pending count, ApplyLeave/PendingApprovals UX polish,
+LeaveTypesPage typed API + deactivate/reactivate.
+209/209 passing. leave-management-plan fully delivered.
