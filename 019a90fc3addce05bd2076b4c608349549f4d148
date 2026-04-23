@@ -1,0 +1,7 @@
+Plan: leave-management-plan.md — Phase 2 + Phase 3
+Related: leave-management-complete.md — Phase 2: HK Holidays & Working Days, Phase 3: Leave Types & Balance Ledger
+
+Phase 2: PublicHoliday model, HK holiday seed, workingDays.service
+(weekend + holiday exclusion, half-day support).
+Phase 3: LeaveType CRUD (HR_ADMIN), LeaveBalance init/query,
+LeaveTypesPage UI. 28 new tests; 81/81 total passing.
