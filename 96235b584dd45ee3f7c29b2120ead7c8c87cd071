@@ -1,0 +1,6 @@
+Plan: leave-management-plan.md — Phase 1: Scaffold, Auth & MSAL Stub
+Related: leave-management-complete.md — Phase 1
+
+Initial monorepo bootstrap: Vite+React client, Express+Prisma server,
+JWT auth routes (login/register/refresh), MSAL stub, requireRole
+middleware, Docker Compose, seed users. 81 tests passing.
