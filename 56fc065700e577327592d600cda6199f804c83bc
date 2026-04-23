@@ -1,0 +1,5 @@
+Plan: improvements-plan.md + improvements-complete.md
+Related: post-implementation documentation housekeeping
+
+Consolidates all per-phase completion files into improvements-complete.md
+(8 phases, 282 tests). No code changes.
