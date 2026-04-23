@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { register, login, refreshToken } from "../services/auth.service";
 import {
   isAzureConfigured,
@@ -10,20 +11,30 @@ import {
 import prisma from "../lib/prisma";
 import { JwtService } from "../auth/jwt.service";
 import { asyncHandler } from "../lib/asyncHandler";
+import { AppError } from "../lib/AppError";
 import { Role } from "@prisma/client";
+
+const registerBodySchema = z.object({
+  name: z.string().min(1),
+  email: z.string().min(1),
+  password: z.string().min(1),
+});
+
+const loginBodySchema = z.object({
+  email: z.string().min(1),
+  password: z.string().min(1),
+});
 
 const router = Router();
 
 router.post(
   "/register",
   asyncHandler(async (req: Request, res: Response) => {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      res.status(400).json({ message: "Missing required fields" });
-      return;
+    const parsed = registerBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError("Missing required fields", 400, "VALIDATION_ERROR");
     }
-
+    const { name, email, password } = parsed.data;
     const result = await register(name, email, password);
     res.status(201).json(result);
   })
@@ -32,13 +43,11 @@ router.post(
 router.post(
   "/login",
   asyncHandler(async (req: Request, res: Response) => {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      res.status(400).json({ message: "Missing required fields" });
-      return;
+    const parsed = loginBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError("Missing required fields", 400, "VALIDATION_ERROR");
     }
-
+    const { email, password } = parsed.data;
     const result = await login(email, password);
     res.status(200).json(result);
   })

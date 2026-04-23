@@ -1,8 +1,15 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { Prisma, LeaveStatus, Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { asyncHandler } from "../lib/asyncHandler";
+import { AppError } from "../lib/AppError";
+
+const calendarQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12),
+});
 
 export const leaveCalendarRouter = Router();
 
@@ -18,31 +25,19 @@ leaveCalendarRouter.get(
   "/",
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    const yearParam = req.query.year as string | undefined;
-    const monthParam = req.query.month as string | undefined;
-
-    if (!yearParam) {
-      res.status(400).json({ message: "year is required" });
-      return;
-    }
-    if (!monthParam) {
-      res.status(400).json({ message: "month is required" });
-      return;
-    }
-
-    const year = parseInt(yearParam, 10);
-    const month = parseInt(monthParam, 10);
-
-    if (isNaN(year) || isNaN(month)) {
-      res.status(400).json({ message: "year and month must be integers" });
-      return;
+    const parsed = calendarQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      if (!req.query.year) {
+        throw new AppError("year is required", 400, "VALIDATION_ERROR");
+      }
+      if (!req.query.month) {
+        throw new AppError("month is required", 400, "VALIDATION_ERROR");
+      }
+      throw new AppError(issue.message, 400, "VALIDATION_ERROR");
     }
 
-    if (month < 1 || month > 12) {
-      res.status(400).json({ message: "month must be between 1 and 12" });
-      return;
-    }
-
+    const { year, month } = parsed.data;
     const firstDayOfMonth = new Date(Date.UTC(year, month - 1, 1));
     const lastDayOfMonth = new Date(Date.UTC(year, month, 0));
 
