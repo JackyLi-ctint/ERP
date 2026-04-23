@@ -1,0 +1,6 @@
+Plan: improvements-plan.md — Phase 7: Route boundary hardening
+Related: improvements-complete.md — Phase 7
+
+Replace all manual parseInt/isNaN/range checks at route boundaries with
+Zod coerce schemas (auth.ts, holidays.ts, leaveBalance.ts,
+leaveCalendar.ts). Simpler, type-safe, consistent input validation.
