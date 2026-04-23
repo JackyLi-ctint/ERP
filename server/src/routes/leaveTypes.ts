@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
@@ -35,7 +36,7 @@ router.get(
   "/",
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    const isAdmin = (req as any).user?.role === "HR_ADMIN";
+    const isAdmin = req.user!.role === Role.HR_ADMIN;
     const leaveTypes = await prisma.leaveType.findMany({
       where: isAdmin ? {} : { isActive: true },
       select: {

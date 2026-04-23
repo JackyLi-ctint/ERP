@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { asyncHandler } from "../lib/asyncHandler";
@@ -38,11 +39,11 @@ leaveRequestDetailRouter.get(
     const actorId = req.user!.id;
     const actorRole = req.user!.role;
 
-    if (actorRole === "EMPLOYEE") {
+    if (actorRole === Role.EMPLOYEE) {
       if (leaveRequest.employeeId !== actorId) {
         throw new Error("Forbidden: You can only view your own leave requests");
       }
-    } else if (actorRole === "MANAGER") {
+    } else if (actorRole === Role.MANAGER) {
       if (leaveRequest.employeeId !== actorId) {
         const actor = await prisma.user.findUnique({
           where: { id: actorId },

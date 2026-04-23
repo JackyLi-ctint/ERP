@@ -1,4 +1,4 @@
-import { PrismaClient, Role, LeaveStatus, LeaveRequest, User } from "@prisma/client";
+import { PrismaClient, Prisma, Role, LeaveStatus, LeaveRequest, User } from "@prisma/client";
 import { sendLeaveApprovedEmail, sendLeaveRejectedEmail } from "./email.service";
 
 type TxClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
@@ -22,7 +22,7 @@ async function assertTeamAuthorization(
   actorRole: Role,
   tx: TxClient
 ): Promise<void> {
-  if (actorRole === "HR_ADMIN") {
+  if (actorRole === Role.HR_ADMIN) {
     return; // HR_ADMIN bypasses team check
   }
 
@@ -384,9 +384,9 @@ export async function getSubordinatePendingRequests(
   actorId: string,
   actorRole: Role,
   prisma: PrismaClient
-): Promise<(LeaveRequest & { employee: User; leaveType: any })[]> {
+): Promise<(LeaveRequest & { employee: User; leaveType: Prisma.LeaveTypeGetPayload<{}> })[]> {
   // HR_ADMIN sees all PENDING + CANCEL_REQUESTED (excluding own requests)
-  if (actorRole === "HR_ADMIN") {
+  if (actorRole === Role.HR_ADMIN) {
     return prisma.leaveRequest.findMany({
       where: {
         status: { in: ["PENDING" as LeaveStatus, "CANCEL_REQUESTED" as LeaveStatus] },

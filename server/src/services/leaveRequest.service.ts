@@ -1,4 +1,4 @@
-import { PrismaClient, LeaveRequest } from "@prisma/client";
+import { PrismaClient, LeaveRequest, Role } from "@prisma/client";
 import { countWorkingDays, getHolidaySet } from "./workingDays.service";
 import { sendNewLeaveRequestEmail } from "./email.service";
 
@@ -186,7 +186,7 @@ export async function submitLeaveRequest(
       // Query managers in the same team
       const managers = await prisma.user.findMany({
         where: {
-          role: "MANAGER",
+          role: Role.MANAGER,
           team: employee.team,
         },
         select: { email: true },
@@ -194,7 +194,7 @@ export async function submitLeaveRequest(
 
       // Query all HR_ADMIN users
       const hrAdmins = await prisma.user.findMany({
-        where: { role: "HR_ADMIN" },
+        where: { role: Role.HR_ADMIN },
         select: { email: true },
       });
 

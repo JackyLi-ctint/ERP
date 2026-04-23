@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { Prisma, LeaveStatus } from "@prisma/client";
+import { Prisma, LeaveStatus, Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { asyncHandler } from "../lib/asyncHandler";
@@ -59,9 +59,9 @@ leaveCalendarRouter.get(
 
     let whereClause: Prisma.LeaveRequestWhereInput = baseWhere;
 
-    if (actorRole === "EMPLOYEE") {
+    if (actorRole === Role.EMPLOYEE) {
       whereClause = { ...baseWhere, employeeId: actorId };
-    } else if (actorRole === "MANAGER") {
+    } else if (actorRole === Role.MANAGER) {
       const actor = await prisma.user.findUnique({
         where: { id: actorId },
         select: { team: true },

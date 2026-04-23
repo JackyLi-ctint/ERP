@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import type { Role } from "@prisma/client";
+import { Role } from "@prisma/client";
+
+export const SUPERUSER_ROLES: Role[] = [Role.HR_ADMIN];
 
 export function requireRole(...roles: Role[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
@@ -7,8 +9,8 @@ export function requireRole(...roles: Role[]) {
       throw new Error("Unauthorized: User not authenticated");
     }
 
-    // HR_ADMIN is a superuser and passes all role checks
-    if (req.user.role === "HR_ADMIN") {
+    // Superusers pass all role checks
+    if (SUPERUSER_ROLES.includes(req.user.role)) {
       next();
       return;
     }

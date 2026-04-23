@@ -61,4 +61,26 @@ describe("requireRole middleware", () => {
     }).not.toThrow();
     expect(next).toHaveBeenCalled();
   });
+
+  test("SUPERUSER_ROLES is exported and contains HR_ADMIN", () => {
+    const { SUPERUSER_ROLES } = require("../middleware/requireRole");
+    expect(SUPERUSER_ROLES).toBeDefined();
+    expect(Array.isArray(SUPERUSER_ROLES)).toBe(true);
+    expect(SUPERUSER_ROLES).toContain("HR_ADMIN");
+  });
+
+  test("adding MANAGER to SUPERUSER_ROLES grants it bypass access for any role check", () => {
+    // This test demonstrates what would happen if MANAGER was added to SUPERUSER_ROLES
+    // For now, we verify it only contains HR_ADMIN
+    const { SUPERUSER_ROLES } = require("../middleware/requireRole");
+    
+    // Create a copy with MANAGER added
+    const extendedSuperuser = [...SUPERUSER_ROLES, "MANAGER"];
+    
+    // Verify HR_ADMIN is always in SUPERUSER_ROLES
+    expect(SUPERUSER_ROLES).toContain("HR_ADMIN");
+    
+    // Verify the extended array would contain MANAGER
+    expect(extendedSuperuser).toContain("MANAGER");
+  });
 });

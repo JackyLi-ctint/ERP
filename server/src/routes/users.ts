@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { Role } from "@prisma/client";
+import { Role, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { parse } from "csv-parse/sync";
 import prisma from "../lib/prisma";
@@ -9,6 +9,7 @@ import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { asyncHandler } from "../lib/asyncHandler";
 import { upload } from "../middleware/upload";
+import config from "../config";
 
 const usersRouter = Router();
 
@@ -97,7 +98,7 @@ usersRouter.post(
       return;
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, config.bcryptRounds);
     const user = await prisma.user.create({
       data: { name, email, passwordHash, role, team, title, department },
       select: { id: true, name: true, email: true, role: true, team: true, title: true, department: true },
@@ -139,7 +140,7 @@ usersRouter.patch(
     }
 
     // Update user identity
-    const updateData: any = {};
+    const updateData: Prisma.UserUpdateInput = {};
     if (team !== undefined) {
       updateData.team = team;
     }
@@ -203,7 +204,7 @@ usersRouter.patch(
     const updateData: Record<string, unknown> = {};
     if (name) updateData.name = name;
     if (email) updateData.email = email;
-    if (password) updateData.passwordHash = await bcrypt.hash(password, 12);
+    if (password) updateData.passwordHash = await bcrypt.hash(password, config.bcryptRounds);
     if (role) updateData.role = role;
     if (team !== undefined) updateData.team = team || null;
     if (title !== undefined) updateData.title = title || null;
@@ -298,7 +299,7 @@ usersRouter.post(
 
         // Generate random UUID as temp password
         const tempPassword = randomUUID();
-        const passwordHash = await bcrypt.hash(tempPassword, 12);
+        const passwordHash = await bcrypt.hash(tempPassword, config.bcryptRounds);
 
         // Create user
         await prisma.user.create({
