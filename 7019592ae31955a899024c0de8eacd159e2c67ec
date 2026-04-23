@@ -1,0 +1,9 @@
+Plan: improvements-plan.md — Phase 8 (post-plan hardening)
+Related: improvements-complete.md — Phase 8: Structured Logging, Bulk-Route Hardening, Server Resilience
+
+Implements observability and correctness improvements not in the original
+7-phase plan, added as Phase 8 after plan completion review:
+- Structured pino logging (replaces all console.log/error)
+- Remove redundant try/catch from bulk-approve/bulk-reject (AppError propagates naturally)
+- DATABASE_URL startup validation + SIGTERM/SIGINT graceful shutdown
+- managerLeaveRequests.route.test.ts (5 integration tests)
