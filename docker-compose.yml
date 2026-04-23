@@ -34,20 +34,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ./server:/app/server
-    command: npm run start --workspace=server
 
   client:
     build:
       context: .
       dockerfile: client/Dockerfile
-    container_name: leave_management_client
+    container_name: leave_management_frontend
     ports:
       - "5173:5173"
-    volumes:
-      - ./client:/app/client
-    command: npm run dev --workspace=client
 
 volumes:
   postgres_data:

@@ -134,7 +134,7 @@ export function PendingApprovalsPage() {
     if (!modal) return;
     if (modal.type === "reject") {
       rejectMutation.mutate({ id: modal.id, comment });
-    } else {
+    } else if (modal.type === "rejectCancel") {
       rejectCancelMutation.mutate({ id: modal.id, comment });
     }
   }
