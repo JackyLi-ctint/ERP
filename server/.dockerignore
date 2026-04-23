@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+*.log
+coverage
+.git
+.gitignore
+jest.config.ts
+test-output.txt
+test-results.txt
