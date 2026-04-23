@@ -1,0 +1,6 @@
+Plan: improvements-plan.md — Phase 7: Shared Types prep
+Related: improvements-complete.md — Phase 7 (Shared Types + Playwright E2E)
+
+Centralise Role enum and SUPERUSER_ROLES constant; replace all hardcoded
+role strings across routes, middleware and tests with typed enum values.
+Prerequisite cleanup for shared-types workspace package.
