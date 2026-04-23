@@ -1,0 +1,6 @@
+Plan: leave-management-plan.md — Phase 4: Leave Application Submission
+Related: leave-management-complete.md — Phase 4
+
+LeaveRequest model + submit/cancel service, CANCEL_REQUESTED workflow
+branch, team-scoped approval service (TOCTOU prevention, HR_ADMIN bypass,
+self-approval block). 23 new tests; 126/126 total passing.
