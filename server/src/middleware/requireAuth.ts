@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { JwtService } from "../auth/jwt.service";
+import { AppError } from "../lib/AppError";
 
 export function requireAuth(
   req: Request,
@@ -9,7 +10,7 @@ export function requireAuth(
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new Error("Unauthorized: Missing or invalid Authorization header");
+    throw new AppError("Unauthorized: Missing or invalid Authorization header", 401, "UNAUTHORIZED");
   }
 
   const token = authHeader.slice(7); // Remove "Bearer " prefix
@@ -22,6 +23,6 @@ export function requireAuth(
     };
     next();
   } catch (error) {
-    throw new Error("Unauthorized: Invalid or expired token");
+    throw new AppError("Unauthorized: Invalid or expired token", 401, "UNAUTHORIZED");
   }
 }

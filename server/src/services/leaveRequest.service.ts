@@ -1,6 +1,7 @@
 import { PrismaClient, LeaveRequest, Role } from "@prisma/client";
 import { countWorkingDays, getHolidaySet } from "./workingDays.service";
 import { sendNewLeaveRequestEmail } from "./email.service";
+import { AppError } from "../lib/AppError";
 
 /**
  * Submit a new leave request
@@ -29,7 +30,7 @@ export async function submitLeaveRequest(
 ): Promise<LeaveRequest> {
   // Validate date ordering
   if (data.startDate > data.endDate) {
-    throw new Error("start date must not be after end date");
+    throw new AppError("start date must not be after end date", 422, "VALIDATION_ERROR");
   }
 
   // Get today's date in UTC (start of day)
@@ -57,17 +58,17 @@ export async function submitLeaveRequest(
 
   // Validate start date is not in the past
   if (startDateUtc < today) {
-    throw new Error("start date cannot be in the past");
+    throw new AppError("start date cannot be in the past", 422, "VALIDATION_ERROR");
   }
 
   // Validate halfDay is only used on single-day ranges
   if (data.halfDay && startDateUtc.getTime() !== endDateUtc.getTime()) {
-    throw new Error("halfDay can only be used for single-day leave");
+    throw new AppError("halfDay can only be used for single-day leave", 422, "VALIDATION_ERROR");
   }
 
   // Ensure period is provided if halfDay is true
   if (data.halfDay && !data.period) {
-    throw new Error("period (AM or PM) is required when halfDay is true");
+    throw new AppError("period (AM or PM) is required when halfDay is true", 422, "VALIDATION_ERROR");
   }
 
   // Get year from start date
@@ -93,7 +94,7 @@ export async function submitLeaveRequest(
 
   // Validate there are working days in the range
   if (totalDays === 0) {
-    throw new Error("No working days in the specified date range");
+    throw new AppError("No working days in the specified date range", 422, "VALIDATION_ERROR");
   }
 
   // Check if leaveBalance exists for employee+type+year
@@ -108,16 +109,20 @@ export async function submitLeaveRequest(
   });
 
   if (!balance) {
-    throw new Error(
-      "Leave balance not found for this leave type and year. Please contact HR."
+    throw new AppError(
+      "Leave balance not found for this leave type and year. Please contact HR.",
+      422,
+      "VALIDATION_ERROR"
     );
   }
 
   // Check sufficient balance
   const availableDays = balance.totalDays - balance.usedDays - balance.pendingDays;
   if (totalDays > availableDays) {
-    throw new Error(
-      `Insufficient balance. Available: ${availableDays} days, Requested: ${totalDays} days`
+    throw new AppError(
+      `Insufficient balance. Available: ${availableDays} days, Requested: ${totalDays} days`,
+      422,
+      "VALIDATION_ERROR"
     );
   }
 
@@ -132,8 +137,10 @@ export async function submitLeaveRequest(
   });
 
   if (overlappingRequests.length > 0) {
-    throw new Error(
-      "You have an overlapping leave request that is already pending or approved"
+    throw new AppError(
+      "You have an overlapping leave request that is already pending or approved",
+      409,
+      "CONFLICT"
     );
   }
 
@@ -244,12 +251,12 @@ export async function cancelLeaveRequest(
   });
 
   if (!request) {
-    throw new Error("Leave request not found");
+    throw new AppError("Leave request not found", 404, "NOT_FOUND");
   }
 
   // Verify ownership
   if (request.employeeId !== userId) {
-    throw new Error("Forbidden: You can only cancel your own requests");
+    throw new AppError("Forbidden: You can only cancel your own requests", 403, "FORBIDDEN");
   }
 
   // Handle PENDING → CANCELLED (existing behavior)
@@ -305,8 +312,10 @@ export async function cancelLeaveRequest(
   }
 
   // Any other status is not cancellable
-  throw new Error(
-    `Cannot cancel: request is not in a cancellable state`
+  throw new AppError(
+    `Cannot cancel: request is not in a cancellable state`,
+    422,
+    "VALIDATION_ERROR"
   );
 }
 
@@ -322,7 +331,7 @@ export async function getLeaveRequestsForUser(
   prisma?: PrismaClient
 ): Promise<LeaveRequest[]> {
   if (!prisma) {
-    throw new Error("Prisma client is required");
+    throw new AppError("Prisma client is required", 500, "SERVER_ERROR");
   }
 
   const where: any = {

@@ -4,6 +4,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import routes from "./routes";
 import config from "./config";
+import { AppError } from "./lib/AppError";
 
 export function createApp() {
   const app = express();
@@ -56,18 +57,12 @@ export function createApp() {
     res.status(404).json({ message: "Not Found" });
   });
 
-  // Global JSON error handler — must be last; catches synchronous throws from middleware
+  // Global JSON error handler — must be last; catches errors forwarded via next(err)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     console.error(err);
-    if (err.message.includes("Unauthorized")) {
-      res.status(401).json({ message: err.message });
-    } else if (err.message.includes("Forbidden")) {
-      res.status(403).json({ message: err.message });
-    } else if (err.message.includes("Not found") || err.message.includes("Not Found")) {
-      res.status(404).json({ message: err.message });
-    } else if (err.message.includes("Validation error") || err.message.includes("validation")) {
-      res.status(400).json({ message: err.message });
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({ message: err.message });
     } else {
       res.status(500).json({ message: "An unexpected error occurred." });
     }

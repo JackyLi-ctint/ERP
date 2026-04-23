@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma, Role, LeaveStatus, LeaveRequest, User } from "@prisma/client";
 import { sendLeaveApprovedEmail, sendLeaveRejectedEmail } from "./email.service";
+import { AppError } from "../lib/AppError";
 
 type TxClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -8,7 +9,7 @@ type TxClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transa
  */
 function assertNotSelfApproval(request: LeaveRequest, actorId: string): void {
   if (request.employeeId === actorId) {
-    throw new Error("Cannot approve your own leave request");
+    throw new AppError("Cannot approve your own leave request", 422, "VALIDATION_ERROR");
   }
 }
 
@@ -29,7 +30,7 @@ async function assertTeamAuthorization(
   const actor = await tx.user.findUnique({ where: { id: actorId } });
 
   if (!actor || !actor.team || actor.team !== request.employee.team) {
-    throw new Error("Forbidden: not authorised to act on this request");
+    throw new AppError("Forbidden: not authorised to act on this request", 403, "FORBIDDEN");
   }
 }
 
@@ -52,12 +53,12 @@ export async function approveLeaveRequest(
   });
 
   if (!request) {
-    throw new Error("Leave request not found");
+    throw new AppError("Leave request not found", 404, "NOT_FOUND");
   }
 
   // Validate status
   if (request.status !== "PENDING") {
-    throw new Error("Cannot approve: request is not PENDING");
+    throw new AppError("Cannot approve: request is not PENDING", 422, "VALIDATION_ERROR");
   }
 
   // Self-approval check (sync, outside tx)
@@ -149,17 +150,17 @@ export async function rejectLeaveRequest(
   });
 
   if (!request) {
-    throw new Error("Leave request not found");
+    throw new AppError("Leave request not found", 404, "NOT_FOUND");
   }
 
   // Validate comment
   if (!comment || comment.trim() === "") {
-    throw new Error("Approver comment is required for rejection");
+    throw new AppError("Approver comment is required for rejection", 422, "VALIDATION_ERROR");
   }
 
   // Validate status
   if (request.status !== "PENDING") {
-    throw new Error("Cannot reject: request is not PENDING");
+    throw new AppError("Cannot reject: request is not PENDING", 422, "VALIDATION_ERROR");
   }
 
   // Self-approval check (sync, outside tx)
@@ -250,12 +251,12 @@ export async function approveCancellation(
   });
 
   if (!request) {
-    throw new Error("Leave request not found");
+    throw new AppError("Leave request not found", 404, "NOT_FOUND");
   }
 
   // Validate status
   if (request.status !== "CANCEL_REQUESTED") {
-    throw new Error("Cannot approve: request is not CANCEL_REQUESTED");
+    throw new AppError("Cannot approve: request is not CANCEL_REQUESTED", 422, "VALIDATION_ERROR");
   }
 
   // Self-approval check (sync, outside tx)
@@ -328,17 +329,17 @@ export async function rejectCancellation(
   });
 
   if (!request) {
-    throw new Error("Leave request not found");
+    throw new AppError("Leave request not found", 404, "NOT_FOUND");
   }
 
   // Validate comment
   if (!comment || comment.trim() === "") {
-    throw new Error("Approver comment is required for rejection");
+    throw new AppError("Approver comment is required for rejection", 422, "VALIDATION_ERROR");
   }
 
   // Validate status
   if (request.status !== "CANCEL_REQUESTED") {
-    throw new Error("Cannot reject: request is not CANCEL_REQUESTED");
+    throw new AppError("Cannot reject: request is not CANCEL_REQUESTED", 422, "VALIDATION_ERROR");
   }
 
   // Self-approval check (sync, outside tx)
@@ -447,7 +448,7 @@ export async function bulkApproveLeaveRequests(
 ): Promise<LeaveRequest[]> {
   // Validate ids array is not empty
   if (!ids || ids.length === 0) {
-    throw new Error("No request IDs provided");
+    throw new AppError("No request IDs provided", 400, "BAD_REQUEST");
   }
 
   // Find all requests with employee relation
@@ -458,14 +459,14 @@ export async function bulkApproveLeaveRequests(
 
   // Validate all requests exist
   if (requests.length !== ids.length) {
-    throw new Error("One or more leave requests not found");
+    throw new AppError("One or more leave requests not found", 404, "NOT_FOUND");
   }
 
   // Self-approval check (sync, outside tx)
   for (const request of requests) {
     assertNotSelfApproval(request, actorId);
     if (request.status !== "PENDING") {
-      throw new Error(`Cannot approve: request ${request.id} is not PENDING`);
+      throw new AppError(`Cannot approve: request ${request.id} is not PENDING`, 422, "VALIDATION_ERROR");
     }
   }
 
@@ -541,12 +542,12 @@ export async function bulkRejectLeaveRequests(
 ): Promise<LeaveRequest[]> {
   // Validate ids array is not empty
   if (!ids || ids.length === 0) {
-    throw new Error("No request IDs provided");
+    throw new AppError("No request IDs provided", 400, "BAD_REQUEST");
   }
 
   // Validate comment is required
   if (!comment || comment.trim() === "") {
-    throw new Error("Comment is required for rejection");
+    throw new AppError("Comment is required for rejection", 422, "VALIDATION_ERROR");
   }
 
   // Find all requests with employee relation
@@ -557,14 +558,14 @@ export async function bulkRejectLeaveRequests(
 
   // Validate all requests exist
   if (requests.length !== ids.length) {
-    throw new Error("One or more leave requests not found");
+    throw new AppError("One or more leave requests not found", 404, "NOT_FOUND");
   }
 
   // Self-approval check (sync, outside tx)
   for (const request of requests) {
     assertNotSelfApproval(request, actorId);
     if (request.status !== "PENDING") {
-      throw new Error(`Cannot reject: request ${request.id} is not PENDING`);
+      throw new AppError(`Cannot reject: request ${request.id} is not PENDING`, 422, "VALIDATION_ERROR");
     }
   }
 

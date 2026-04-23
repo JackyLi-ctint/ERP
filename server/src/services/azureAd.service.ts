@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { ConfidentialClientApplication, Configuration } from "@azure/msal-node";
 import config from "../config";
+import { AppError } from "../lib/AppError";
 
 let _msalClient: ConfidentialClientApplication | null = null;
 
@@ -74,7 +75,7 @@ export async function acquireTokenByCode(code: string): Promise<{
   });
 
   if (!result?.account?.homeAccountId || !result.idTokenClaims) {
-    throw new Error("Failed to acquire token");
+    throw new AppError("Failed to acquire token", 503, "SERVICE_UNAVAILABLE");
   }
 
   const claims = result.idTokenClaims as Record<string, unknown>;
@@ -83,7 +84,7 @@ export async function acquireTokenByCode(code: string): Promise<{
   const email = (claims["preferred_username"] as string) || (claims["email"] as string);
 
   if (!oid || !email) {
-    throw new Error("Missing required claims in token");
+    throw new AppError("Missing required claims in token", 400, "BAD_REQUEST");
   }
 
   return { oid, name, email };

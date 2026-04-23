@@ -3,6 +3,7 @@ import { PrismaClient, Role } from "@prisma/client";
 import { JwtService } from "../auth/jwt.service";
 import { z } from "zod";
 import config from "../config";
+import { AppError } from "../lib/AppError";
 
 const prisma = new PrismaClient();
 
@@ -43,7 +44,7 @@ export async function register(
   const validation = RegisterSchema.safeParse({ name, email, password });
   if (!validation.success) {
     const errors = validation.error.issues.map((e) => e.message).join(", ");
-    throw new Error(`Validation error: ${errors}`);
+    throw new AppError(`Validation error: ${errors}`, 400, 'VALIDATION_ERROR');
   }
 
   // Check if user already exists
@@ -52,7 +53,7 @@ export async function register(
   });
 
   if (existingUser) {
-    throw new Error(`User with email ${email} already exists`);
+    throw new AppError(`User with email ${email} already exists`, 409, 'CONFLICT');
   }
 
   // Hash password with bcrypt cost factor from config
@@ -101,7 +102,7 @@ export async function login(
   const validation = LoginSchema.safeParse({ email, password });
   if (!validation.success) {
     const errors = validation.error.issues.map((e) => e.message).join(", ");
-    throw new Error(`Validation error: ${errors}`);
+    throw new AppError(`Validation error: ${errors}`, 400, 'VALIDATION_ERROR');
   }
 
   // Find user — fetch passwordHash only for verification, not included in AuthResponse
@@ -111,14 +112,14 @@ export async function login(
   });
 
   if (!user) {
-    throw new Error("Invalid email or password");
+    throw new AppError("Invalid email or password", 401, 'UNAUTHORIZED');
   }
 
   // Verify password
   const passwordMatch = await bcrypt.compare(password, user.passwordHash);
 
   if (!passwordMatch) {
-    throw new Error("Invalid email or password");
+    throw new AppError("Invalid email or password", 401, 'UNAUTHORIZED');
   }
 
   // Generate tokens
@@ -157,7 +158,7 @@ export async function refreshToken(token: string): Promise<AuthResponse> {
     });
 
     if (!user) {
-      throw new Error("User not found");
+      throw new AppError("User not found", 401, 'UNAUTHORIZED');
     }
 
     // Generate new tokens
@@ -184,6 +185,6 @@ export async function refreshToken(token: string): Promise<AuthResponse> {
       },
     };
   } catch (error) {
-    throw new Error("Invalid or expired refresh token");
+    throw new AppError("Invalid or expired refresh token", 401, 'UNAUTHORIZED');
   }
 }

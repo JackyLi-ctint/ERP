@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { asyncHandler } from "../lib/asyncHandler";
+import { AppError } from "../lib/AppError";
 
 export const leaveRequestDetailRouter = Router();
 
@@ -41,7 +42,7 @@ leaveRequestDetailRouter.get(
 
     if (actorRole === Role.EMPLOYEE) {
       if (leaveRequest.employeeId !== actorId) {
-        throw new Error("Forbidden: You can only view your own leave requests");
+        throw new AppError("Forbidden: You can only view your own leave requests", 403, "FORBIDDEN");
       }
     } else if (actorRole === Role.MANAGER) {
       if (leaveRequest.employeeId !== actorId) {
@@ -50,7 +51,7 @@ leaveRequestDetailRouter.get(
           select: { team: true },
         });
         if (!actor?.team || actor.team !== leaveRequest.employee.team) {
-          throw new Error("Forbidden: You can only view leave requests from your team");
+          throw new AppError("Forbidden: You can only view leave requests from your team", 403, "FORBIDDEN");
         }
       }
     }

@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Request, Response } from "express";
 import { register, login, refreshToken } from "../services/auth.service";
 import {
   isAzureConfigured,
@@ -9,30 +9,10 @@ import {
 } from "../services/azureAd.service";
 import prisma from "../lib/prisma";
 import { JwtService } from "../auth/jwt.service";
+import { asyncHandler } from "../lib/asyncHandler";
+import { Role } from "@prisma/client";
 
 const router = Router();
-
-// Error handling middleware for route handlers
-const asyncHandler =
-  (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch((error: Error) => {
-      if (error.message.includes("already exists")) {
-        res.status(409).json({ message: error.message });
-      } else if (error.message.includes("Validation error")) {
-        res.status(400).json({ message: error.message });
-      } else if (error.message.includes("Invalid email or password")) {
-        res.status(401).json({ message: error.message });
-      } else if (
-        error.message.includes("Invalid or expired") ||
-        error.message.includes("Refresh token is required")
-      ) {
-        res.status(401).json({ message: error.message });
-      } else {
-        res.status(500).json({ message: error.message });
-      }
-    });
-  };
 
 router.post(
   "/register",
@@ -136,7 +116,7 @@ router.get(
             email,
             passwordHash: tempHash,
             msEntraOid: oid,
-            role: "EMPLOYEE",
+            role: Role.EMPLOYEE,
           },
         });
       }

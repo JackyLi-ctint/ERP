@@ -1,25 +1,11 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { getBalancesForUser } from "../services/leaveBalance.service";
+import { asyncHandler } from "../lib/asyncHandler";
 
 const router = Router();
-
-// Error handling middleware for route handlers
-const asyncHandler =
-  (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch((error: Error) => {
-      if (error.message.includes("Forbidden")) {
-        res.status(403).json({ message: error.message });
-      } else if (error.message.includes("Not found")) {
-        res.status(404).json({ message: error.message });
-      } else {
-        res.status(500).json({ message: error.message });
-      }
-    });
-  };
 
 /**
  * GET /api/me/balances?year=YYYY

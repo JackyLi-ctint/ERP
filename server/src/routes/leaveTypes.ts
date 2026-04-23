@@ -5,6 +5,7 @@ import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { asyncHandler } from "../lib/asyncHandler";
+import { AppError } from "../lib/AppError";
 
 const router = Router();
 
@@ -109,10 +110,10 @@ router.post(
       const error = validationResult.error.issues[0];
       if (error.code === "too_small") {
         // Semantic validation error - return 422
-        throw new Error(`Semantic validation error: ${error.path.join(".")}: ${error.message}`);
+        throw new AppError(`Semantic validation error: ${error.path.join(".")}: ${error.message}`, 422, "VALIDATION_ERROR");
       } else {
         // Structural validation error - return 400
-        throw new Error(`Validation error: ${error.path.join(".")}: ${error.message}`);
+        throw new AppError(`Validation error: ${error.path.join(".")}: ${error.message}`, 400, "BAD_REQUEST");
       }
     }
 
@@ -124,7 +125,7 @@ router.post(
     });
 
     if (existing) {
-      throw new Error(`Leave type '${data.name}' already exists`);
+      throw new AppError(`Leave type '${data.name}' already exists`, 409, "CONFLICT");
     }
 
     // Create the leave type
@@ -175,10 +176,10 @@ router.patch(
       const error = validationResult.error.issues[0];
       if (error.code === "too_small") {
         // Semantic validation error - return 422
-        throw new Error(`Semantic validation error: ${error.path.join(".")}: ${error.message}`);
+        throw new AppError(`Semantic validation error: ${error.path.join(".")}: ${error.message}`, 422, "VALIDATION_ERROR");
       } else {
         // Structural validation error - return 400
-        throw new Error(`Validation error: ${error.path.join(".")}: ${error.message}`);
+        throw new AppError(`Validation error: ${error.path.join(".")}: ${error.message}`, 400, "BAD_REQUEST");
       }
     }
 
@@ -200,7 +201,7 @@ router.patch(
         where: { name: data.name },
       });
       if (duplicate) {
-        throw new Error(`Leave type '${data.name}' already exists`);
+        throw new AppError(`Leave type '${data.name}' already exists`, 409, "CONFLICT");
       }
     }
 

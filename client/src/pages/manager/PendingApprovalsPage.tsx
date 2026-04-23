@@ -143,6 +143,51 @@ export function PendingApprovalsPage() {
     rejectMutation.isPending || rejectCancelMutation.isPending;
 
   const bulkApproveMutation = useMutation({
+    mutationFn: (ids: number[]) => bulkApproveLeaveRequests(ids),
+    onSuccess: () => {
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["pendingApprovals"] });
+      showFeedback(`${selectedIds.size} request(s) approved.`);
+    },
+  });
+
+  const bulkRejectMutation = useMutation({
+    mutationFn: ({ ids, comment }: { ids: number[]; comment: string }) =>
+      bulkRejectLeaveRequests(ids, comment),
+    onSuccess: () => {
+      setModal(null);
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["pendingApprovals"] });
+      showFeedback("Request(s) rejected.");
+    },
+  });
+
+  function toggleSelectAll() {
+    if (selectedIds.size === requests.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(requests.map((r) => r.id)));
+    }
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleBulkApprove() {
+    if (!window.confirm(`Approve ${selectedIds.size} request(s)?`)) return;
+    bulkApproveMutation.mutate(Array.from(selectedIds));
+  }
+
+  function handleBulkRejectConfirm(comment: string) {
+    if (!modal || modal.type !== "bulkReject") return;
+    bulkRejectMutation.mutate({ ids: modal.ids, comment });
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
