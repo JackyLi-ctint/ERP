@@ -1,0 +1,6 @@
+Plan: leave-management-plan.md — Phase 5: Approver Workflow + Calendar (UI)
+Related: leave-management-complete.md — Phase 5
+
+GET /api/leave-calendar (role-scoped: employee/team/all),
+LeaveCalendarPage with CSS grid, month navigation, colour-coded chips.
+13 new tests; 166/166 total passing.
