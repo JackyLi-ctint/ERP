@@ -1,0 +1,11 @@
+Plan: improvements-plan.md — Phases 1–6
+Related: improvements-complete.md — Phase 1 through Phase 6
+
+Phase 1: ErrorBoundary, SessionExpiredModal, Prisma postinstall.
+Phase 2: Leave history filters, cancellation reason modal.
+Phase 3: Bulk approve/reject (POST /bulk-approve, /bulk-reject).
+Phase 4: Email notifications via nodemailer (approve/reject/submit).
+Phase 5: Audit Log Viewer (GET /admin/audit-logs, AuditLogPage).
+Phase 6: CSV user import (multer, csv-parse) + Azure Entra ID OIDC
+scaffold (MSAL, state CSRF, initiate/callback routes, LoginPage button).
+15 new tests for import + Azure OIDC flows.
