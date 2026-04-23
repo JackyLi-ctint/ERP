@@ -1,0 +1,6 @@
+Plan: improvements-plan.md — Phase 7: Application hardening
+Related: improvements-complete.md — Phase 7 (Dashboard Polish + Hardening)
+
+Introduce AppError class; migrate all 44 throw sites across services,
+routes and middleware. Remove legacy regex fallback from asyncHandler.
+Update global error handler to instanceof check. 7 new unit tests.
