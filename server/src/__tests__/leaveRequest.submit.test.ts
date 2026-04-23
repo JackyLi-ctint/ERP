@@ -11,6 +11,13 @@ describe("POST /api/leave-requests (submit)", () => {
   let leaveTypeId: number;
   let authToken: string;
 
+  beforeAll(() => {
+    jest.useFakeTimers({
+      doNotFake: ["hrtime", "nextTick", "performance", "queueMicrotask", "setImmediate", "clearImmediate", "setInterval", "clearInterval", "setTimeout", "clearTimeout"],
+    });
+    jest.setSystemTime(new Date("2026-03-18T00:00:00Z"));
+  });
+
   beforeEach(async () => {
     // Clean up in correct order
     await prisma.leaveRequest.deleteMany({});
@@ -139,6 +146,7 @@ describe("POST /api/leave-requests (submit)", () => {
   });
 
   afterAll(async () => {
+    jest.useRealTimers();
     await prisma.leaveRequest.deleteMany({});
     await prisma.leaveBalance.deleteMany({});
     await prisma.leaveType.deleteMany({});

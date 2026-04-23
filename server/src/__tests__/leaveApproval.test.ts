@@ -22,6 +22,13 @@ describe("LeaveApproval Service", () => {
   let pendingRequest: { id: number; status: LeaveStatus; totalDays: number; employeeId: string };
 
   beforeAll(async () => {
+    // Clean up any leftover data from previous suites
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.leaveBalance.deleteMany({});
+    await prisma.leaveType.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.user.deleteMany({});
+
     // Create users
     hrAdmin = await prisma.user.create({
       data: {

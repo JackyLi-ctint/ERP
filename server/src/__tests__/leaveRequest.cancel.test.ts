@@ -13,6 +13,13 @@ describe("PATCH /api/leave-requests/:id/cancel (cancel with reason)", () => {
   let authToken: string;
   let otherUserToken: string;
 
+  beforeAll(() => {
+    jest.useFakeTimers({
+      doNotFake: ["hrtime", "nextTick", "performance", "queueMicrotask", "setImmediate", "clearImmediate", "setInterval", "clearInterval", "setTimeout", "clearTimeout"],
+    });
+    jest.setSystemTime(new Date("2026-03-18T00:00:00Z"));
+  });
+
   beforeEach(async () => {
     // Clean up in correct order
     await prisma.leaveRequest.deleteMany({});
@@ -273,5 +280,15 @@ describe("PATCH /api/leave-requests/:id/cancel (cancel with reason)", () => {
       });
 
     expect(res.status).toBe(404);
+  });
+
+  afterAll(async () => {
+    jest.useRealTimers();
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.leaveBalance.deleteMany({});
+    await prisma.leaveType.deleteMany({});
+    await prisma.publicHoliday.deleteMany({});
+    await prisma.user.deleteMany({});
+    await prisma.$disconnect();
   });
 });

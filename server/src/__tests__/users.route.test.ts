@@ -16,6 +16,10 @@ describe("users routes", () => {
 
   beforeEach(async () => {
     // Clean up
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.leaveBalance.deleteMany({});
+    await prisma.leaveType.deleteMany({});
+    await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
     // Create HR_ADMIN
@@ -85,6 +89,10 @@ describe("users routes", () => {
   });
 
   afterEach(async () => {
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.leaveBalance.deleteMany({});
+    await prisma.leaveType.deleteMany({});
+    await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
   });
 

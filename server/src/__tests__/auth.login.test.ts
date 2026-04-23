@@ -10,6 +10,10 @@ describe("POST /api/auth/login", () => {
 
   beforeEach(async () => {
     // Reset database before each test
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.leaveBalance.deleteMany({});
+    await prisma.leaveType.deleteMany({});
+    await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 
     // Create a test user
@@ -24,6 +28,11 @@ describe("POST /api/auth/login", () => {
   });
 
   afterAll(async () => {
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.leaveBalance.deleteMany({});
+    await prisma.leaveType.deleteMany({});
+    await prisma.auditLog.deleteMany({});
+    await prisma.user.deleteMany({});
     await prisma.$disconnect();
   });
 
