@@ -1,0 +1,6 @@
+Plan: improvements-plan.md — Phase 7: Config hardening
+Related: improvements-complete.md — Phase 7
+
+Correct central config defaults (auth rate limit 20→10, API window 900s→60s,
+bodyLimit 16kb→10mb). Add 12 config unit tests for env reads, defaults,
+and type coercion.
