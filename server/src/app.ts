@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import routes from "./routes";
+import config from "./config";
 
 export function createApp() {
   const app = express();
@@ -13,13 +14,13 @@ export function createApp() {
   // CORS configuration
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+      origin: config.corsOrigins,
       credentials: true,
     })
   );
 
   // Body parsing middleware
-  app.use(express.json({ limit: '16kb' }));
+  app.use(express.json({ limit: config.bodyLimit }));
   app.use(express.urlencoded({ extended: true }));
 
   // Health check endpoint
@@ -29,8 +30,8 @@ export function createApp() {
 
   // Rate limiting for auth endpoints (OWASP A07)
   const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20,
+    windowMs: config.rateLimitAuth.windowMs,
+    max: config.rateLimitAuth.max,
     standardHeaders: true,
     legacyHeaders: false,
     message: { message: "Too many requests, please try again later." },
@@ -39,8 +40,8 @@ export function createApp() {
 
   // General API rate limiter
   const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
+    windowMs: config.rateLimitApi.windowMs,
+    max: config.rateLimitApi.max,
     standardHeaders: true,
     legacyHeaders: false,
     message: { message: "Too many requests, please try again later." },

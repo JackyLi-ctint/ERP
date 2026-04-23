@@ -1,12 +1,12 @@
 import { randomUUID } from "crypto";
 import { ConfidentialClientApplication, Configuration } from "@azure/msal-node";
+import config from "../config";
 
 let _msalClient: ConfidentialClientApplication | null = null;
 
 // In-memory store for OAuth state values (CSRF protection).
 // State is created on /initiate and consumed once on /callback.
 const _pendingStates = new Map<string, number>(); // state → expiry epoch ms
-const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export function generateState(): string {
   // Purge expired states to avoid unbounded growth
@@ -15,7 +15,7 @@ export function generateState(): string {
     if (exp < now) _pendingStates.delete(key);
   }
   const state = randomUUID();
-  _pendingStates.set(state, now + STATE_TTL_MS);
+  _pendingStates.set(state, now + config.azureStateTtlMs);
   return state;
 }
 

@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { PrismaClient, Role } from "@prisma/client";
 import { JwtService } from "../auth/jwt.service";
 import { z } from "zod";
+import config from "../config";
 
 const prisma = new PrismaClient();
 
@@ -54,8 +55,8 @@ export async function register(
     throw new Error(`User with email ${email} already exists`);
   }
 
-  // Hash password with bcrypt cost factor 12
-  const passwordHash = await bcrypt.hash(password, 12);
+  // Hash password with bcrypt cost factor from config
+  const passwordHash = await bcrypt.hash(password, config.bcryptRounds);
 
   // Create user
   const user = await prisma.user.create({

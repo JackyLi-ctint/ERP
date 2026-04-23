@@ -4,6 +4,7 @@ import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { asyncHandler } from "../lib/asyncHandler";
+import config from "../config";
 
 export const adminLeaveRequestsRouter = Router();
 
@@ -32,8 +33,8 @@ adminLeaveRequestsRouter.get(
     }
 
     const page = pageRaw ? Math.max(1, parseInt(pageRaw, 10)) : 1;
-    let pageSize = pageSizeRaw ? parseInt(pageSizeRaw, 10) : 20;
-    if (pageSize > 100) pageSize = 100;
+    let pageSize = pageSizeRaw ? parseInt(pageSizeRaw, 10) : config.pagination.defaultSize;
+    if (pageSize > config.pagination.maxSize) pageSize = config.pagination.maxSize;
     if (pageSize < 1) pageSize = 1;
 
     const where: Prisma.LeaveRequestWhereInput = {};

@@ -4,6 +4,7 @@ import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { asyncHandler } from "../lib/asyncHandler";
+import config from "../config";
 
 const adminAuditLogsRouter = Router();
 
@@ -19,7 +20,7 @@ const querySchema = z.object({
   entityType: z.string().optional(),
   actorId: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  pageSize: z.coerce.number().int().min(1).max(config.pagination.maxSize).default(config.pagination.defaultSize),
 });
 
 adminAuditLogsRouter.get(
