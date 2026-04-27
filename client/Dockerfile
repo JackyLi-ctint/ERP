@@ -1,4 +1,5 @@
-FROM node:20-alpine
+# Stage 1: Build
+FROM node:20-alpine AS builder
 
 # Prisma requires OpenSSL on Alpine
 RUN apk add --no-cache openssl
@@ -14,14 +15,17 @@ COPY server/prisma ./server/prisma/
 
 RUN npm install
 
-# Copy source code
+# Copy source code and build
 COPY . .
-
-# Build client
 WORKDIR /app/client
 RUN npm run build
 
-# Serve with vite preview
-EXPOSE 5173
+# Stage 2: Serve with nginx
+FROM nginx:alpine
 
-CMD ["npm", "run", "preview"]
+COPY --from=builder /app/client/dist /usr/share/nginx/html
+COPY client/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
