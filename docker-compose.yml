@@ -40,11 +40,10 @@ services:
       context: .
       dockerfile: client/Dockerfile
     container_name: leave_management_frontend
-    environment:
-      # vite preview proxy target - server is on internal Docker network
-      VITE_API_PROXY_TARGET: http://server:3000
     ports:
-      - "5173:5173"
+      - "80:80"
+    depends_on:
+      - server
 
 volumes:
   postgres_data:
