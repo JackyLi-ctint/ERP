@@ -1,0 +1,13 @@
+# Production overrides for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Differences from dev:
+#   - postgres port 5432 is NOT exposed to the host (internal only)
+#   - server port 3000 is NOT exposed to the host (nginx handles all traffic)
+
+services:
+  postgres:
+    ports: []
+
+  server:
+    ports: []
