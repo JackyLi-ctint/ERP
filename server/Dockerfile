@@ -23,5 +23,5 @@ WORKDIR /app/server
 # Expose port
 EXPOSE 3000
 
-# Run migrations and start server
-CMD ["npx", "tsx", "src/server.ts"]
+# Run migrations then start server
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx src/server.ts"]
